@@ -1,0 +1,31 @@
+# ---- Flutter / Dart ----
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/.pub-cache/
+flutter_app/.pub/
+build/
+.dart_tool/
+
+# pubspec.lock IS tracked on purpose: this is an application, not a
+# package library, so the resolved dependency set must be reproducible.
+# Do not add it here.
+
+# ---- Editors / OS ----
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# ---- Claude Code local state ----
+.claude/settings.local.json
+
+# ---- graphify code graph ----
+# The graph is a rebuildable artifact (`graphify update .`), and graph.json
+# runs to several MB. The .graphifyignore that scopes it IS tracked.
+graphify-out/
+
+# ---- Generated report samples (regenerate via report export flows) ----
+output/

@@ -1,0 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  errors:
+    # Enforced by design system — every string goes through l10n/strings.dart
+    prefer_const_constructors: warning
+    prefer_const_declarations: warning
+
+linter:
+  rules:
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_const_literals_to_create_immutables
+    - avoid_print
+    - use_key_in_widget_constructors
+    - sort_child_properties_last

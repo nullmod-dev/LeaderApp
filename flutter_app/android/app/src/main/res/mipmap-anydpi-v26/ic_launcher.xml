@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Leader launcher icon — the "06 · Clean Layer" mark.
+
+  Two layers, because Android composes and masks them itself: the deep teal
+  ground the mark is drawn on, and the mark scaled to 59 of the 108dp canvas
+  so the whole tile survives a rounded-square mask and every glyph — the
+  L and ليدر both — stays inside the 66dp circle a round launcher keeps.
+
+  The mark is FIXED here. The in-app logo is user-selectable
+  (`BrandLogo`, Settings → المظهر والأداء); the home-screen icon is not,
+  because Android cannot change a launcher icon without disabling and
+  re-enabling an activity-alias, which drops the user's placed shortcut.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

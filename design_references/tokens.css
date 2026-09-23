@@ -1,0 +1,683 @@
+/* ============================================================
+   MTM — Design Tokens
+   Three palettes × two modes, all colors driven by CSS vars.
+   Default palette = A "Clinical Slate" (charcoal + brick).
+   ============================================================ */
+
+/* ---------- Fonts (Readex Pro + JetBrains Mono) ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ---- Type ---- */
+  --font-sans: "Readex Pro", "Segoe UI", "SF Arabic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ---- Type scale ---- */
+  --fs-display: 28px;
+  --fs-title:   22px;
+  --fs-heading: 17px;
+  --fs-body:    15px;
+  --fs-meta:    13px;
+
+  /* ---- Space / radii ---- */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  12px;
+  --r-xl:  16px;
+  --r-pill: 999px;
+
+  --hair: 1px solid var(--line);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.06);
+  --shadow-md: 0 2px 6px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08);
+
+  /* ---- Phone frame ---- */
+  --phone-w: 390px;
+  --phone-h: 844px;
+}
+
+/* ============================================================
+   PALETTE A — "Clinical Slate"
+   Charcoal ink, warm stone bg, brick primary. Default.
+   ============================================================ */
+[data-palette="A"][data-mode="light"] {
+  --bg:        #ECEAE4;   /* warm stone canvas */
+  --surface:   #FFFFFF;   /* cards */
+  --surface-2: #F5F3EE;   /* subtle raised */
+  --surface-3: #E4E1D9;   /* sunk */
+  --ink:       #1A1F26;   /* text, structure */
+  --ink-2:     #4A5058;   /* secondary text */
+  --ink-3:     #7A8189;   /* tertiary / muted labels */
+  --line:      #DAD6CC;   /* hairlines */
+  --line-2:    #C7C2B4;   /* stronger dividers */
+
+  --primary:      #B84A3E;   /* brick — Primary CTA */
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #9E3B2F;   /* pressed */
+  --primary-tint: #F5E4E0;   /* soft bg */
+
+  --ok:      #1F8F5A;   /* present / in-stock / valid */
+  --ok-tint: #DFF1E7;
+  --warn:      #D48806;   /* late / low / expiring */
+  --warn-tint: #FBEBCB;
+  --crit:      #7A241B;   /* absent / out / expired  — DEEPER than primary */
+  --crit-tint: #F0D8D3;
+  --muted:     #7C8B92;   /* N/A / unknown */
+  --muted-tint:#E4E7E8;
+
+  --focus: #B84A3E;
+}
+[data-palette="A"][data-mode="dark"] {
+  --bg:        #0F1319;
+  --surface:   #171C24;
+  --surface-2: #1E242E;
+  --surface-3: #262D38;
+  --ink:       #EDECE6;
+  --ink-2:     #B4B7BD;
+  --ink-3:     #7C8189;
+  --line:      #2B323D;
+  --line-2:    #3A424F;
+
+  --primary:      #D26254;
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #B84A3E;
+  --primary-tint: #3A1E1A;
+
+  --ok:      #3AB878;
+  --ok-tint: #143726;
+  --warn:      #E8A63D;
+  --warn-tint: #3A2A0F;
+  --crit:      #E24E3F;
+  --crit-tint: #3D1A16;
+  --muted:     #8A939B;
+  --muted-tint:#2A303A;
+
+  --focus: #D26254;
+}
+
+/* ============================================================
+   PALETTE B — "Field Copper"  (blue-charcoal + copper)
+   ============================================================ */
+[data-palette="B"][data-mode="light"] {
+  --bg:        #EAEBEE;
+  --surface:   #FFFFFF;
+  --surface-2: #F2F4F7;
+  --surface-3: #DFE3E9;
+  --ink:       #141B26;
+  --ink-2:     #46505E;
+  --ink-3:     #78828F;
+  --line:      #D6DBE2;
+  --line-2:    #BFC6D0;
+
+  --primary:      #B45341;
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #96412F;
+  --primary-tint: #F3E1DA;
+
+  --ok:      #1E8A6E;
+  --ok-tint: #DAF0E7;
+  --warn:      #C89424;
+  --warn-tint: #F7EAC9;
+  --crit:      #7B2116;
+  --crit-tint: #EDD6D0;
+  --muted:     #7B8894;
+  --muted-tint:#DFE3E9;
+
+  --focus: #B45341;
+}
+[data-palette="B"][data-mode="dark"] {
+  --bg:        #0C121C;
+  --surface:   #141C29;
+  --surface-2: #1B2435;
+  --surface-3: #232E43;
+  --ink:       #E9ECF2;
+  --ink-2:     #A9B3C0;
+  --ink-3:     #6F7B8B;
+  --line:      #253046;
+  --line-2:    #354061;
+
+  --primary:      #CE6952;
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #B45341;
+  --primary-tint: #3A1E17;
+
+  --ok:      #35B48D;
+  --ok-tint: #12362A;
+  --warn:      #DDA43B;
+  --warn-tint: #38290F;
+  --crit:      #DA4E3F;
+  --crit-tint: #3B1A15;
+  --muted:     #8993A2;
+  --muted-tint:#28324A;
+
+  --focus: #CE6952;
+}
+
+/* ============================================================
+   PALETTE C — "Desert Clay"  (warm brown + terracotta)
+   ============================================================ */
+[data-palette="C"][data-mode="light"] {
+  --bg:        #EDE6D8;
+  --surface:   #FCF9F2;
+  --surface-2: #F3ECDA;
+  --surface-3: #E3D9C1;
+  --ink:       #1F1912;
+  --ink-2:     #4E4436;
+  --ink-3:     #83795F;
+  --line:      #D6C9AC;
+  --line-2:    #BFAE87;
+
+  --primary:      #A83A2E;
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #8B2A21;
+  --primary-tint: #EFD9D3;
+
+  --ok:      #4A7A3E;
+  --ok-tint: #DFE9D4;
+  --warn:      #B8791A;
+  --warn-tint: #F1E1BE;
+  --crit:      #6B1F17;
+  --crit-tint: #E6CDC6;
+  --muted:     #857960;
+  --muted-tint:#DED4B9;
+
+  --focus: #A83A2E;
+}
+[data-palette="C"][data-mode="dark"] {
+  --bg:        #14100A;
+  --surface:   #1E1912;
+  --surface-2: #26201626;
+  --surface-2: #26201A;
+  --surface-3: #302921;
+  --ink:       #ECE4D2;
+  --ink-2:     #B0A78F;
+  --ink-3:     #7A7057;
+  --line:      #2E2719;
+  --line-2:    #40372A;
+
+  --primary:      #C55643;
+  --primary-ink:  #FFFFFF;
+  --primary-2:    #A83A2E;
+  --primary-tint: #3A1913;
+
+  --ok:      #6DA55A;
+  --ok-tint: #1C2C15;
+  --warn:      #D69A2C;
+  --warn-tint: #382712;
+  --crit:      #C64B3D;
+  --crit-tint: #3A1811;
+  --muted:     #9A8E70;
+  --muted-tint:#2E2716;
+
+  --focus: #C55643;
+}
+
+/* ============================================================
+   Global reset + phone frame styles
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+body { font-size: var(--fs-body); line-height: 1.5; }
+
+.mono, .num { font-family: var(--font-mono); font-feature-settings: "tnum" 1, "lnum" 1; }
+
+/* Phone frame — a phone-sized surface, no bezel (design_canvas gives us the card). */
+.phone {
+  width: var(--phone-w);
+  height: var(--phone-h);
+  background: var(--bg);
+  color: var(--ink);
+  direction: rtl;
+  font-family: var(--font-sans);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.phone[dir="ltr"] { direction: ltr; }
+
+/* Status bar (fake iOS) */
+.statusbar {
+  height: 44px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  flex-shrink: 0;
+}
+.statusbar .sb-right { display: flex; gap: 6px; align-items: center; }
+.statusbar .sb-icon { width: 16px; height: 11px; }
+
+/* Screen scroll area */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+.screen::-webkit-scrollbar { width: 0; }
+
+/* Top bar */
+.topbar {
+  padding: 10px 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border-bottom: var(--hair);
+  min-height: 56px;
+}
+.topbar .tb-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+}
+.topbar .tb-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: var(--hair);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.card-pad { padding: 16px; }
+
+/* Row with leading state rail */
+.row {
+  position: relative;
+  min-height: 56px;
+  padding: 12px 16px 12px 16px;
+  padding-inline-start: 20px;   /* leaves 4px for rail */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: var(--hair);
+  background: var(--surface);
+}
+.row:last-child { border-bottom: none; }
+.row .rail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--muted);
+}
+.row .rail.ok   { background: var(--ok); }
+.row .rail.warn { background: var(--warn); }
+.row .rail.crit { background: var(--crit); }
+.row .rail.muted{ background: var(--muted); }
+.row .rail.info { background: var(--primary); }
+
+.row .body { flex: 1; min-width: 0; }
+.row .title { font-size: 15px; font-weight: 500; color: var(--ink); }
+.row .sub   { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+
+/* Chip */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.chip.ok   { background: var(--ok-tint);   color: var(--ok);   border-color: var(--ok); }
+.chip.warn { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
+.chip.crit { background: var(--crit-tint); color: var(--crit); border-color: var(--crit); }
+.chip.muted{ background: var(--muted-tint);color: var(--ink-2);border-color: var(--line-2); }
+.chip.info { background: var(--primary-tint); color: var(--primary); border-color: var(--primary); }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  height: 52px;
+  border-radius: var(--r-lg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--primary-ink);
+  transition: background 120ms ease;
+}
+.btn:hover  { background: var(--primary-2); }
+.btn.block  { width: 100%; }
+.btn.ghost  { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.small  { height: 40px; font-size: 14px; padding: 0 14px; }
+.btn.link   { background: transparent; color: var(--primary); height: auto; padding: 0; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Primary action bar pinned to bottom of phone */
+.action-bar {
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  border-top: var(--hair);
+  flex-shrink: 0;
+}
+
+/* Bottom tab bar */
+.tabbar {
+  display: flex;
+  border-top: var(--hair);
+  background: var(--surface);
+  height: 68px;
+  padding-bottom: 6px;
+  flex-shrink: 0;
+}
+.tabbar .tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ink-3);
+  padding-top: 8px;
+  position: relative;
+}
+.tabbar .tab.active { color: var(--primary); }
+.tabbar .tab .ic { width: 24px; height: 24px; }
+.tabbar .tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20%; right: 20%;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 0 0 3px 3px;
+}
+
+/* Form field */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+.field .input {
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.field .input:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 20%, transparent); }
+.field .input.num { font-family: var(--font-mono); letter-spacing: .5px; }
+.field .input input, .field .input textarea {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  flex: 1;
+  padding: 0;
+  min-width: 0;
+}
+.field .hint { font-size: 12px; color: var(--ink-3); }
+.field.error .input { border-color: var(--crit); }
+.field.error .hint { color: var(--crit); }
+
+/* Segmented (three-way for attendance) */
+.seg {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: var(--r-lg);
+  padding: 3px;
+  gap: 3px;
+  border: var(--hair);
+}
+.seg .segbtn {
+  flex: 1;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.seg .segbtn.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.seg .segbtn.active.ok   { color: var(--ok); }
+.seg .segbtn.active.warn { color: var(--warn); }
+.seg .segbtn.active.crit { color: var(--crit); }
+
+/* Section header inside a screen */
+.section-h {
+  padding: 20px 16px 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.section-h .t { font-size: 13px; font-weight: 600; color: var(--ink-3); letter-spacing: .05em; text-transform: uppercase; }
+.section-h .a { font-size: 13px; color: var(--primary); font-weight: 500; }
+
+/* Numeric big display */
+.big-num {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -.5px;
+}
+
+/* Skeleton */
+.skel { background: var(--surface-2); border-radius: 6px; height: 12px; overflow: hidden; position: relative; }
+.skel::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--ink) 6%, transparent), transparent);
+  animation: skel 1.4s infinite;
+}
+@keyframes skel { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+/* Divider */
+.hr { height: 1px; background: var(--line); margin: 12px 0; }
+
+/* Utility */
+.text-mono { font-family: var(--font-mono); }
+.text-ink2 { color: var(--ink-2); }
+.text-ink3 { color: var(--ink-3); }
+.text-primary { color: var(--primary); }
+.text-ok   { color: var(--ok); }
+.text-warn { color: var(--warn); }
+.text-crit { color: var(--crit); }
+.text-muted{ color: var(--muted); }
+.flex { display: flex; }
+.col  { display: flex; flex-direction: column; }
+.g4  { gap: 4px; } .g6 { gap: 6px; } .g8 { gap: 8px; } .g12 { gap: 12px; } .g16 { gap: 16px; }
+.p4  { padding: 4px; } .p8 { padding: 8px; } .p12 { padding: 12px; } .p16 { padding: 16px; }
+.px16 { padding-inline: 16px; } .py12 { padding-block: 12px; }
+.mt4 { margin-top: 4px; } .mt8 { margin-top: 8px; } .mt12 { margin-top: 12px; } .mt16 { margin-top: 16px; } .mt24 { margin-top: 24px; }
+.mb4 { margin-bottom: 4px; } .mb8 { margin-bottom: 8px; } .mb16 { margin-bottom: 16px; }
+.center { align-items: center; }
+.between { justify-content: space-between; }
+.right { text-align: end; }
+.grow { flex: 1; min-width: 0; }
+.round { border-radius: var(--r-lg); }
+.round-full { border-radius: var(--r-pill); }
+
+/* Weight */
+.w-500 { font-weight: 500; } .w-600 { font-weight: 600; } .w-700 { font-weight: 700; }
+.fs-11 { font-size: 11px; } .fs-13 { font-size: 13px; } .fs-15 { font-size: 15px; } .fs-17 { font-size: 17px; }
+.fs-22 { font-size: 22px; } .fs-28 { font-size: 28px; }
+
+/* Home indicator */
+.home-ind {
+  width: 134px;
+  height: 5px;
+  background: var(--ink);
+  opacity: .8;
+  border-radius: 3px;
+  margin: 4px auto 0;
+}
+
+/* ==========================================================
+   Glass Tab Bar — Apple liquid-glass floating pill (4 tabs)
+   Sits absolute over the phone, doesn't push content down.
+   Screens using GlassTabBar must add `.screen--floating`
+   for extra bottom padding so content doesn't hide beneath.
+   ========================================================== */
+.glass-tabbar-wrap {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.glass-tabbar {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 999px;
+  /* Translucent frosted-glass surface */
+  background: color-mix(in oklab, var(--surface) 62%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid color-mix(in oklab, var(--ink) 8%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--surface) 90%, transparent) inset,
+    0 12px 32px -8px rgba(0, 0, 0, 0.28),
+    0 4px 12px -4px rgba(0, 0, 0, 0.18);
+  direction: rtl;
+}
+/* Dark mode: darker glass, brighter hairline */
+body[data-mode="dark"] .glass-tabbar {
+  background: color-mix(in oklab, var(--surface) 55%, transparent);
+  border-color: color-mix(in oklab, #fff 10%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, #fff 6%, transparent) inset,
+    0 14px 40px -10px rgba(0, 0, 0, 0.55),
+    0 6px 16px -6px rgba(0, 0, 0, 0.35);
+}
+
+.gtab {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  font-family: inherit;
+  border-radius: 999px;
+  transition: color 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.gtab:hover { color: var(--ink); }
+.gtab:active .gtab-pill { transform: scale(0.94); }
+
+.gtab-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 260ms cubic-bezier(0.34, 1.28, 0.64, 1),
+              padding 260ms cubic-bezier(0.34, 1.28, 0.64, 1),
+              transform 160ms ease;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.gtab-ic { width: 20px; height: 20px; flex-shrink: 0; }
+.gtab-label {
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 260ms cubic-bezier(0.34, 1.28, 0.64, 1),
+              opacity 200ms ease 40ms;
+}
+.gtab.active {
+  color: var(--primary-ink);
+}
+.gtab.active .gtab-pill {
+  background: var(--primary);
+  padding: 0 14px 0 12px;
+  box-shadow:
+    0 4px 12px -2px color-mix(in oklab, var(--primary) 55%, transparent),
+    0 2px 4px -1px rgba(0, 0, 0, 0.14);
+}
+.gtab.active .gtab-label {
+  max-width: 120px;
+  opacity: 1;
+}
+
+/* Ambient home indicator under the pill (iOS handle) */
+.glass-home-ind {
+  width: 120px;
+  height: 4px;
+  background: var(--ink);
+  opacity: .28;
+  border-radius: 3px;
+  pointer-events: none;
+}
+body[data-mode="dark"] .glass-home-ind { opacity: .5; }
+
+/* Screen padding so scrollable content clears the floating bar */
+.screen--floating { padding-bottom: 96px; }
+.screen--floating > *:last-child { margin-bottom: 12px; }
+

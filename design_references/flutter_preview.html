@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MTM · معاينة Flutter الحية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==============================================================
+   MTM Flutter Preview — pixel-accurate mirror of the Dart widgets.
+   Same tokens, same animations, same behavior as the Flutter code.
+   ============================================================== */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root { color-scheme: light dark; }
+
+/* --------- Palette definitions (mirrors mtm_colors.dart) --------- */
+
+/* Slate — light */
+body[data-palette="slate"][data-mode="light"] {
+  --bg:#ECEAE4; --surface:#FFFFFF; --surface2:#F5F3EE; --surface3:#E4E1D9;
+  --ink:#1A1F26; --ink2:#4A5058; --ink3:#7A8189;
+  --line:#DAD6CC; --line2:#C7C2B4;
+  --primary:#B84A3E; --primary-ink:#FFFFFF; --primary-pressed:#9E3B2F; --primary-tint:#F5E4E0;
+  --ok:#1F8F5A; --ok-tint:#DFF1E7;
+  --warn:#D48806; --warn-tint:#FBEBCB;
+  --crit:#7A241B; --crit-tint:#F0D8D3;
+  --muted:#7C8B92; --muted-tint:#E4E7E8;
+  --info:#1B6C99; --info-tint:#DCEBF3;
+  --focus:#B84A3E;
+  --glow: transparent;
+}
+/* Slate — dark */
+body[data-palette="slate"][data-mode="dark"] {
+  --bg:#0F1319; --surface:#171C24; --surface2:#1E242E; --surface3:#262D38;
+  --ink:#EDECE6; --ink2:#B4B7BD; --ink3:#7C8189;
+  --line:#2B323D; --line2:#3A424F;
+  --primary:#D26254; --primary-ink:#FFFFFF; --primary-pressed:#B84A3E; --primary-tint:#3A1E1A;
+  --ok:#3AB878; --ok-tint:#143726;
+  --warn:#E8A63D; --warn-tint:#3A2A0F;
+  --crit:#E24E3F; --crit-tint:#3D1A16;
+  --muted:#8A939B; --muted-tint:#2A303A;
+  --info:#4C9BCB; --info-tint:#13293A;
+  --focus:#D26254;
+  --glow: transparent;
+}
+
+/* Copper light */
+body[data-palette="copper"][data-mode="light"] {
+  --bg:#EAEBEE; --surface:#FFFFFF; --surface2:#F2F4F7; --surface3:#DFE3E9;
+  --ink:#141B26; --ink2:#46505E; --ink3:#78828F;
+  --line:#D6DBE2; --line2:#BFC6D0;
+  --primary:#B45341; --primary-ink:#FFFFFF; --primary-pressed:#96412F; --primary-tint:#F3E1DA;
+  --ok:#1E8A6E; --ok-tint:#DAF0E7;
+  --warn:#C89424; --warn-tint:#F7EAC9;
+  --crit:#7B2116; --crit-tint:#EDD6D0;
+  --muted:#7B8894; --muted-tint:#DFE3E9;
+  --info:#2E6EA6; --info-tint:#DCEAF5;
+  --focus:#B45341; --glow: transparent;
+}
+body[data-palette="copper"][data-mode="dark"] {
+  --bg:#0C121C; --surface:#141C29; --surface2:#1B2435; --surface3:#232E43;
+  --ink:#E9ECF2; --ink2:#A9B3C0; --ink3:#6F7B8B;
+  --line:#253046; --line2:#354061;
+  --primary:#CE6952; --primary-ink:#FFFFFF; --primary-pressed:#B45341; --primary-tint:#3A1E17;
+  --ok:#35B48D; --ok-tint:#12362A;
+  --warn:#DDA43B; --warn-tint:#38290F;
+  --crit:#DA4E3F; --crit-tint:#3B1A15;
+  --muted:#8993A2; --muted-tint:#28324A;
+  --info:#5B9CD8; --info-tint:#162A45;
+  --focus:#CE6952; --glow: transparent;
+}
+
+/* Clay light */
+body[data-palette="clay"][data-mode="light"] {
+  --bg:#EDE6D8; --surface:#FCF9F2; --surface2:#F3ECDA; --surface3:#E3D9C1;
+  --ink:#1F1912; --ink2:#4E4436; --ink3:#83795F;
+  --line:#D6C9AC; --line2:#BFAE87;
+  --primary:#A83A2E; --primary-ink:#FFFFFF; --primary-pressed:#8B2A21; --primary-tint:#EFD9D3;
+  --ok:#4A7A3E; --ok-tint:#DFE9D4;
+  --warn:#B8791A; --warn-tint:#F1E1BE;
+  --crit:#6B1F17; --crit-tint:#E6CDC6;
+  --muted:#857960; --muted-tint:#DED4B9;
+  --info:#2C5F8A; --info-tint:#DCE5F0;
+  --focus:#A83A2E; --glow: transparent;
+}
+body[data-palette="clay"][data-mode="dark"] {
+  --bg:#14100A; --surface:#1E1912; --surface2:#26201A; --surface3:#302921;
+  --ink:#ECE4D2; --ink2:#B0A78F; --ink3:#7A7057;
+  --line:#2E2719; --line2:#40372A;
+  --primary:#C55643; --primary-ink:#FFFFFF; --primary-pressed:#A83A2E; --primary-tint:#3A1913;
+  --ok:#6DA55A; --ok-tint:#1C2C15;
+  --warn:#D69A2C; --warn-tint:#382712;
+  --crit:#C64B3D; --crit-tint:#3A1811;
+  --muted:#9A8E70; --muted-tint:#2E2716;
+  --info:#5989BE; --info-tint:#182640;
+  --focus:#C55643; --glow: transparent;
+}
+
+/* Aurora Night — SIGNATURE */
+body[data-palette="auroraNight"][data-mode="light"] {
+  --bg:#F4F6FB; --surface:#FFFFFF; --surface2:#ECEFF7; --surface3:#DDE3EF;
+  --ink:#0F1830; --ink2:#3F4A65; --ink3:#6E7893;
+  --line:#D8DDEA; --line2:#BEC5D5;
+  --primary:#3A47C7; --primary-ink:#FFFFFF; --primary-pressed:#2A36AD; --primary-tint:#DEE2FB;
+  --ok:#00A67C; --ok-tint:#CFF0E5;
+  --warn:#E0A800; --warn-tint:#FAEEC7;
+  --crit:#D32F2F; --crit-tint:#FADAD8;
+  --muted:#7B849B; --muted-tint:#E5E8F0;
+  --info:#0A84C4; --info-tint:#CDE7F3;
+  --focus:#3A47C7; --glow:#8A6BFF;
+}
+body[data-palette="auroraNight"][data-mode="dark"] {
+  --bg:#080B18; --surface:#121838; --surface2:#1A2145; --surface3:#232C5A;
+  --ink:#EEF1FA; --ink2:#A9B2CE; --ink3:#6F7A9A;
+  --line:#232B4E; --line2:#313A66;
+  --primary:#7B85FF; --primary-ink:#0B1030; --primary-pressed:#6470E8; --primary-tint:#1E2657;
+  --ok:#34D8A3; --ok-tint:#0F3A2E;
+  --warn:#F5C542; --warn-tint:#3D3110;
+  --crit:#FF5A5A; --crit-tint:#3F1719;
+  --muted:#8B94B0; --muted-tint:#1F2748;
+  --info:#62B9EB; --info-tint:#10334A;
+  --focus:#7B85FF; --glow:#8A6BFF;
+}
+
+/* Sage Serum — SIGNATURE */
+body[data-palette="sageSerum"][data-mode="light"] {
+  --bg:#F3F1EA; --surface:#FFFFFF; --surface2:#EBE8DE; --surface3:#DCD8CA;
+  --ink:#1F2620; --ink2:#4E574F; --ink3:#7D8578;
+  --line:#D6D3C4; --line2:#BEBAA6;
+  --primary:#2F6E5C; --primary-ink:#FCFAF4; --primary-pressed:#23594A; --primary-tint:#D9E7DF;
+  --ok:#3E8F5F; --ok-tint:#DDEEDE;
+  --warn:#C7791C; --warn-tint:#F7E4C7;
+  --crit:#B84A5A; --crit-tint:#F3D6DB;
+  --muted:#888B7C; --muted-tint:#E1DECE;
+  --info:#3F6C8A; --info-tint:#DCE6EF;
+  --focus:#2F6E5C; --glow:#6FCEB1;
+}
+body[data-palette="sageSerum"][data-mode="dark"] {
+  --bg:#13161A; --surface:#1B1F22; --surface2:#23272B; --surface3:#2D3236;
+  --ink:#ECE9DE; --ink2:#B1B0A2; --ink3:#808074;
+  --line:#2A2F32; --line2:#3B4144;
+  --primary:#6DBFA3; --primary-ink:#0F1F1A; --primary-pressed:#57A98D; --primary-tint:#16332B;
+  --ok:#6DBF87; --ok-tint:#162F1E;
+  --warn:#EBA956; --warn-tint:#3B2A11;
+  --crit:#EB7987; --crit-tint:#3B1A20;
+  --muted:#9CA090; --muted-tint:#262A27;
+  --info:#7BA9CB; --info-tint:#152836;
+  --focus:#6DBFA3; --glow:#6FCEB1;
+}
+
+/* Midnight Oasis — SIGNATURE, bold */
+body[data-palette="midnightOasis"][data-mode="light"] {
+  --bg:#F0EEE9; --surface:#FFFFFF; --surface2:#E7E4DC; --surface3:#D5D1C4;
+  --ink:#102420; --ink2:#3B4E4A; --ink3:#6C7E7A;
+  --line:#CFCBBB; --line2:#B6B29E;
+  --primary:#C94F5F; --primary-ink:#FFFFFF; --primary-pressed:#AD3E4E; --primary-tint:#F6D9DE;
+  --ok:#247D6D; --ok-tint:#CDE5E0;
+  --warn:#B68223; --warn-tint:#F3E4C0;
+  --crit:#7A1F26; --crit-tint:#EDCDD1;
+  --muted:#7C8783; --muted-tint:#DDDBCF;
+  --info:#2D6079; --info-tint:#D4E1E8;
+  --focus:#C94F5F; --glow:#FF7B7B;
+}
+body[data-palette="midnightOasis"][data-mode="dark"] {
+  --bg:#071412; --surface:#0E1F1B; --surface2:#152826; --surface3:#1E332F;
+  --ink:#EEF2EF; --ink2:#A9B7B2; --ink3:#6D7C77;
+  --line:#1B302C; --line2:#294540;
+  --primary:#FF7789; --primary-ink:#19070A; --primary-pressed:#E85E70; --primary-tint:#3B1A21;
+  --ok:#3AC2A7; --ok-tint:#0E332C;
+  --warn:#F3C64E; --warn-tint:#3A2C10;
+  --crit:#E05263; --crit-tint:#3D1519;
+  --muted:#8C9994; --muted-tint:#1C302C;
+  --info:#5DA8C7; --info-tint:#102935;
+  --focus:#FF7789; --glow:#FF7B7B;
+}
+
+/* ---------- Base ---------- */
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Readex Pro', system-ui, sans-serif;
+  min-height: 100vh;
+  transition: background 350ms ease, color 350ms ease;
+}
+.mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums slashed-zero; }
+
+/* ---------- Layout ---------- */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 32px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; }
+  .phone-wrap { justify-self: center; }
+}
+
+/* ---------- Header ---------- */
+.header {
+  grid-column: 1 / -1;
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.header h1 {
+  margin: 0; font-size: 24px; font-weight: 600;
+  display: flex; align-items: center; gap: 12px;
+}
+.header .badge {
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--primary-tint); color: var(--primary);
+  font-size: 12px; font-weight: 500;
+}
+.header .sub { font-size: 13px; color: var(--ink3); margin-top: 4px; }
+
+/* ---------- Controls (palette + mode switcher) ---------- */
+.controls {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  transition: background 350ms ease, border-color 350ms ease;
+  position: sticky;
+  top: 24px;
+}
+.controls h3 {
+  margin: 0 0 12px;
+  font-size: 12px; font-weight: 600;
+  color: var(--ink3);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.pal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pal-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; cursor: pointer;
+  font-family: inherit; font-size: 13px; color: var(--ink2);
+  transition: all 240ms cubic-bezier(0.34,1.28,0.64,1);
+  text-align: start;
+}
+.pal-chip:hover { transform: translateY(-1px); }
+.pal-chip:active { transform: scale(0.97); }
+.pal-chip.active {
+  border-color: var(--primary); border-width: 1.5px;
+  background: var(--primary-tint);
+  color: var(--primary); font-weight: 500;
+}
+.pal-swatches { display: flex; gap: 2px; }
+.pal-sw {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+.pal-name { flex: 1; }
+.pal-family {
+  font-size: 10px; padding: 1px 6px; border-radius: 6px;
+  background: var(--muted-tint); color: var(--ink3);
+  font-family: 'JetBrains Mono', monospace; text-transform: uppercase;
+}
+.pal-family.sig { background: var(--warn-tint); color: var(--warn); }
+
+.mode-toggle {
+  display: flex; gap: 4px; margin-top: 20px;
+  background: var(--surface2); padding: 4px;
+  border-radius: 12px; border: 1px solid var(--line);
+}
+.mode-toggle button {
+  flex: 1; padding: 10px; border: none;
+  background: transparent; color: var(--ink2);
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 200ms ease;
+}
+.mode-toggle button.active {
+  background: var(--surface); color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.controls .note {
+  margin-top: 20px; padding: 12px;
+  background: var(--surface2); border-radius: 10px;
+  font-size: 12px; color: var(--ink2); line-height: 1.55;
+}
+
+/* ---------- Phone frame ---------- */
+.phone-wrap {
+  padding: 20px;
+}
+.phone {
+  width: 390px;
+  height: 780px;
+  background: var(--bg);
+  border-radius: 44px;
+  overflow: hidden;
+  border: 8px solid #1a1a1a;
+  box-shadow:
+    0 30px 60px rgba(0,0,0,0.25),
+    0 10px 20px rgba(0,0,0,0.12);
+  position: relative;
+  display: flex; flex-direction: column;
+  transition: background 350ms ease;
+}
+.phone::before {
+  content: '';
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 26px;
+  background: #000; border-radius: 20px;
+  z-index: 10;
+}
+.status-bar {
+  height: 44px;
+  padding: 0 24px 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; font-weight: 600;
+  color: var(--ink); flex-shrink: 0;
+  padding-top: 12px;
+}
+.sb-right { display: flex; gap: 6px; align-items: center; }
+
+/* ---------- App bar ---------- */
+.appbar {
+  padding: 14px 16px 12px;
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.appbar-title { flex: 1; }
+.appbar-title h2 {
+  margin: 0; font-size: 20px; font-weight: 600; color: var(--ink);
+}
+.appbar-title .sub { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: transparent; border: 1px solid transparent;
+  display: grid; place-items: center; cursor: pointer;
+  color: var(--ink2);
+  transition: all 200ms ease;
+}
+.icon-btn:hover { background: var(--surface2); }
+.icon-btn:active { transform: scale(0.94); }
+
+/* ---------- Screen scroll ---------- */
+.screen {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 0 16px 100px;
+}
+.screen::-webkit-scrollbar { width: 0; }
+
+/* ---------- Sync line ---------- */
+.sync-line {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink3);
+  padding: 4px 4px 16px;
+}
+
+/* ---------- Hero card (animated gradient + breathing) ---------- */
+.hero {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  padding: 20px;
+  overflow: hidden;
+  position: relative;
+  animation: breathing 6s ease-in-out infinite;
+  background: var(--surface);
+}
+@keyframes breathing {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.005); opacity: 0.99; }
+}
+
+/* Grounded — quiet flat wash */
+body[data-palette="slate"] .hero,
+body[data-palette="copper"] .hero,
+body[data-palette="clay"] .hero {
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--primary-tint) 40%, var(--surface)),
+    var(--surface));
+}
+
+/* Signature — animated multi-stop glow */
+body[data-palette="auroraNight"] .hero,
+body[data-palette="sageSerum"] .hero,
+body[data-palette="midnightOasis"] .hero {
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--primary) 30%, var(--surface)),
+    color-mix(in oklab, var(--glow) 25%, var(--surface)),
+    color-mix(in oklab, var(--warn) 15%, var(--surface)));
+  background-size: 220% 220%;
+  animation: breathing 6s ease-in-out infinite, gradientShift 12s ease-in-out infinite;
+}
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hero-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.hero-eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink2); font-weight: 500;
+  margin-bottom: 8px;
+}
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok);
+  position: relative;
+  box-shadow: 0 0 8px var(--ok);
+}
+.pulse-dot::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 50%; background: var(--ok);
+  animation: pulseRipple 2s ease-out infinite;
+}
+@keyframes pulseRipple {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.hero h3 {
+  margin: 0; font-size: 22px; font-weight: 600; color: var(--ink);
+}
+.hero .caption { font-size: 13px; color: var(--ink3); margin-top: 4px; }
+
+.count-up {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px; font-weight: 600;
+  color: var(--primary);
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+/* ---------- Chip ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.chip.ok   { background: var(--ok-tint);   color: var(--ok);   border-color: var(--ok); }
+.chip.warn { background: var(--warn-tint); color: var(--warn); border-color: var(--warn); }
+.chip.crit { background: var(--crit-tint); color: var(--crit); border-color: var(--crit); }
+.chip.muted{ background: var(--muted-tint);color: var(--ink2); border-color: var(--line2); }
+.chip.info { background: var(--info-tint); color: var(--info); border-color: var(--info); }
+
+/* ---------- Section header ---------- */
+.section-h {
+  padding: 24px 4px 10px;
+  font-size: 13px; font-weight: 600;
+  color: var(--ink3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ---------- Stat cards ---------- */
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 14px 14px 18px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.stat:active { transform: scale(0.97); }
+.stat::before {
+  content: ''; position: absolute;
+  inset-inline-start: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+.stat.warn::before { background: var(--warn); }
+.stat.crit::before { background: var(--crit); }
+.stat .label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500;
+}
+.stat.warn .label { color: var(--warn); }
+.stat.crit .label { color: var(--crit); }
+.stat .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px; font-weight: 600;
+  color: var(--ink);
+  margin-top: 8px; line-height: 1;
+}
+
+/* ---------- List row ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.row {
+  position: relative;
+  min-height: 68px;
+  padding: 12px 16px 12px 20px;
+  padding-inline-start: 20px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.row:hover { background: var(--surface2); }
+.row + .row { border-top: 1px solid var(--line); }
+.row .rail {
+  position: absolute;
+  inset-block: 0; inset-inline-start: 0;
+  width: 4px; background: var(--muted);
+}
+.row .rail.ok   { background: var(--ok); }
+.row .rail.warn { background: var(--warn); }
+.row .rail.crit { background: var(--crit); }
+.row .rail.info { background: var(--info); }
+.row .avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 600; flex-shrink: 0;
+  font-size: 15px;
+}
+.avatar.ok    { background: var(--ok-tint);    color: var(--ok); }
+.avatar.warn  { background: var(--warn-tint);  color: var(--warn); }
+.avatar.crit  { background: var(--crit-tint);  color: var(--crit); }
+.avatar.muted { background: var(--surface2);   color: var(--ink2); }
+.avatar.info  { background: var(--info-tint);  color: var(--info); }
+.row .body { flex: 1; min-width: 0; }
+.row .title { font-size: 15px; font-weight: 500; color: var(--ink); }
+.row .sub {
+  font-size: 13px; color: var(--ink3); margin-top: 3px;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* ---------- Stagger animation (entry) ---------- */
+.stagger {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: staggerIn 320ms cubic-bezier(0.34, 1.28, 0.64, 1) forwards;
+}
+@keyframes staggerIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Lock window ---------- */
+.lockwin {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 220ms ease;
+}
+.lockwin .caption {
+  font-size: 11px; font-weight: 500; line-height: 1.15;
+  opacity: 0.85;
+}
+.lockwin .value {
+  font-size: 15px; font-weight: 600; line-height: 1.15; margin-top: 2px;
+}
+.lockwin.open       { background: var(--ok-tint);    color: var(--ok);    border-color: var(--ok); }
+.lockwin.restricted { background: var(--warn-tint);  color: var(--warn);  border-color: var(--warn); }
+.lockwin.sealed     { background: var(--muted-tint); color: var(--ink2);  border-color: var(--line2); }
+
+/* Pulsing halo when open + urgent (<60s remaining) */
+.lockwin.urgent {
+  animation: lockPulse 1.6s ease-in-out infinite;
+}
+@keyframes lockPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--ok-rgb, 31, 143, 90), 0); }
+  50%      { box-shadow: 0 0 20px 3px color-mix(in oklab, var(--ok) 45%, transparent); }
+}
+
+/* ---------- Bottom nav ---------- */
+.tabbar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 76px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  display: flex;
+  padding-bottom: 8px;
+  transition: background 350ms ease;
+}
+.tab {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding-top: 8px;
+  font-size: 11px; font-weight: 500;
+  color: var(--ink3); cursor: pointer;
+  position: relative;
+  transition: color 200ms ease;
+}
+.tab.active { color: var(--primary); }
+.tab.active::before {
+  content: ''; position: absolute; top: 0; left: 20%; right: 20%;
+  height: 2px; background: var(--primary);
+  border-radius: 0 0 3px 3px;
+}
+.tab svg { width: 22px; height: 22px; }
+
+/* ---------- Legend (right panel below controls) ---------- */
+.legend {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.7;
+}
+.legend h3 {
+  margin: 0 0 12px; font-size: 12px; font-weight: 600;
+  color: var(--ink3); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.legend b { color: var(--ink); font-weight: 600; }
+.legend code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; padding: 1px 6px;
+  background: var(--surface2); border-radius: 4px;
+  color: var(--primary);
+}
+
+/* ---------- Icons (inline SVG helpers) ---------- */
+svg { display: block; }
+</style>
+</head>
+<body data-palette="auroraNight" data-mode="dark">
+
+<div class="page">
+
+  <!-- ==================== HEADER ==================== -->
+  <div class="header">
+    <div>
+      <h1>
+        MTM · معاينة Flutter الحية
+        <span class="badge">v1.1.0</span>
+      </h1>
+      <div class="sub">نفس الألوان · نفس الأنيميشنات · نفس المكوّنات المكتوبة في Dart</div>
+    </div>
+  </div>
+
+  <!-- ==================== PHONE ==================== -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <div>9:41</div>
+        <div class="sb-right">
+          <svg viewBox="0 0 18 12" width="18" height="12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx=".5"/><rect x="4" y="6" width="3" height="6" rx=".5"/><rect x="8" y="4" width="3" height="8" rx=".5"/><rect x="12" y="2" width="3" height="10" rx=".5"/></svg>
+          <svg viewBox="0 0 18 12" width="18" height="12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 5a8 8 0 0 1 16 0M4 7.5a5 5 0 0 1 10 0M7 10a2 2 0 0 1 4 0" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 26 12" width="26" height="12" fill="none" stroke="currentColor" stroke-width="1"><rect x=".5" y="1" width="22" height="10" rx="2.5"/><rect x="2" y="2.5" width="17" height="7" rx="1" fill="currentColor"/><rect x="23.5" y="4" width="1.5" height="4" rx=".5" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <!-- App bar -->
+      <div class="appbar">
+        <div class="appbar-title">
+          <h2>اليوم</h2>
+          <div class="sub">السبت · 25 أغسطس</div>
+        </div>
+        <button class="icon-btn" title="إشعارات">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        </button>
+        <button class="icon-btn" title="تبديل الوضع" id="mode-toggle-inline">
+          <svg id="mode-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+
+      <!-- Screen -->
+      <div class="screen">
+
+        <!-- Sync line -->
+        <div class="sync-line stagger" style="animation-delay: 0ms">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-15-6.7L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/><path d="M16 16h5v5"/></svg>
+          <span>آخر مزامنة</span>
+          <span class="mono">قبل 4 دقائق</span>
+        </div>
+
+        <!-- Hero -->
+        <div class="hero stagger" style="animation-delay: 60ms">
+          <div class="hero-eyebrow">
+            <div class="pulse-dot"></div>
+            <span>تزامن نشط</span>
+          </div>
+          <div class="hero-row">
+            <div>
+              <h3>مركز الشعلان</h3>
+              <div class="caption mono" dir="ltr" style="text-align: start;">14:00 – 20:00</div>
+              <div style="margin-top: 10px;">
+                <span class="chip ok">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  حاضر
+                </span>
+              </div>
+            </div>
+            <div class="count-up" id="hero-num">7</div>
+          </div>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stat-row stagger" style="animation-delay: 120ms">
+          <div class="stat warn">
+            <div class="label">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+              <span>أدوية منخفضة</span>
+            </div>
+            <div class="value" id="stat-1">6</div>
+          </div>
+          <div class="stat crit">
+            <div class="label">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>تنتهي خلال 30 يوم</span>
+            </div>
+            <div class="value" id="stat-2">3</div>
+          </div>
+        </div>
+
+        <!-- Section: Lock Window -->
+        <div class="section-h stagger" style="animation-delay: 180ms">نافذة القفل · العنصر المميّز</div>
+        <div class="card stagger" style="animation-delay: 220ms; padding: 16px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <div class="lockwin open">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+              <div>
+                <div class="caption">قابل للتعديل</div>
+                <div class="value mono" id="lock-time">47:12</div>
+              </div>
+            </div>
+            <div class="lockwin open urgent">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+              <div>
+                <div class="caption">قابل للتعديل</div>
+                <div class="value mono" id="lock-urgent">00:42</div>
+              </div>
+            </div>
+            <div class="lockwin restricted">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+              <div>
+                <div class="caption">مقيّد</div>
+                <div class="value">تعديل بصلاحية</div>
+              </div>
+            </div>
+            <div class="lockwin sealed">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <div>
+                <div class="caption">مُثبَّت</div>
+                <div class="value">أضف تصحيحا</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Members -->
+        <div class="section-h stagger" style="animation-delay: 280ms">الأعضاء · دخول متسلسل</div>
+        <div class="card stagger" style="animation-delay: 320ms;">
+          <div class="row"><div class="rail ok"></div>
+            <div class="avatar ok">أك</div>
+            <div class="body"><div class="title">أحمد كنعان</div><div class="sub" style="color: var(--ok);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> حاضر
+            </div></div>
+            <span class="chip ok">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              حاضر
+            </span>
+          </div>
+          <div class="row"><div class="rail warn"></div>
+            <div class="avatar warn">سد</div>
+            <div class="body"><div class="title">سامي درويش</div><div class="sub" style="color: var(--warn);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              متأخر · <span class="mono">12د</span>
+            </div></div>
+            <span class="chip warn">متأخر</span>
+          </div>
+          <div class="row"><div class="rail crit"></div>
+            <div class="avatar crit">يب</div>
+            <div class="body"><div class="title">ياسر البكري</div><div class="sub" style="color: var(--crit);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> غائب
+            </div></div>
+            <span class="chip crit">غائب</span>
+          </div>
+          <div class="row"><div class="rail muted"></div>
+            <div class="avatar muted">رس</div>
+            <div class="body"><div class="title">رنا سعيد</div><div class="sub">لم تُدعَ</div></div>
+            <span class="chip muted">لا ينطبق</span>
+          </div>
+        </div>
+
+        <div style="height: 40px;"></div>
+      </div>
+
+      <!-- Bottom tab bar -->
+      <div class="tabbar">
+        <div class="tab active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>اليوم</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>الجدول</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+          <span>المخزون</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>الورش</span>
+        </div>
+        <div class="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          <span>المزيد</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CONTROLS ==================== -->
+  <div>
+    <div class="controls">
+      <h3>اللوحات · 6 اتجاهات</h3>
+      <div class="pal-grid" id="palette-grid"></div>
+
+      <h3 style="margin-top: 20px;">الوضع</h3>
+      <div class="mode-toggle">
+        <button data-mode="light" id="mode-light">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          فاتح
+        </button>
+        <button data-mode="dark" id="mode-dark" class="active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          داكن
+        </button>
+      </div>
+
+      <div class="note">
+        <b style="color: var(--ink);">اللوحات <code>SIG</code></b> تعرض تدرّجاً متحرّكاً في البطاقة الرئيسية.
+        <br><br>
+        الأرقام تعدّ لأعلى عند التبديل، والصفوف تدخل بشكل متسلسل، ونافذة القفل تنبض عند اقتراب انتهاء الوقت.
+      </div>
+    </div>
+
+    <div class="legend">
+      <h3>ما تراه</h3>
+      <span style="color: var(--primary); font-weight: 600;">•</span> بطاقة hero بتدرّج متحرّك (LightingShift 12s)<br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> نبضة "تزامن نشط" (2s loop)<br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> أرقام <code>MtmCountUp</code> بـ tabular figures<br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> نافذة قفل مع halo نابض (urgent)<br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> دخول متسلسل <code>MtmStagger</code><br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> أيقونة متحوّلة <code>MtmMorphingIcon</code> (Moon↔Sun)<br>
+      <span style="color: var(--primary); font-weight: 600;">•</span> ضغط لمسي <code>MtmPressScale</code> على البطاقات
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================================
+// Palette + mode switching (mirrors Riverpod controllers)
+// =============================================================
+const PALETTES = [
+  { id: 'slate',         name: 'Slate',          family: 'GRD', p: '#B84A3E', o: '#1F8F5A', w: '#D48806' },
+  { id: 'copper',        name: 'Copper',         family: 'GRD', p: '#B45341', o: '#1E8A6E', w: '#C89424' },
+  { id: 'clay',          name: 'Clay',           family: 'GRD', p: '#A83A2E', o: '#4A7A3E', w: '#B8791A' },
+  { id: 'auroraNight',   name: 'Aurora Night',   family: 'SIG', p: '#7B85FF', o: '#34D8A3', w: '#F5C542' },
+  { id: 'sageSerum',     name: 'Sage Serum',     family: 'SIG', p: '#6DBFA3', o: '#6DBF87', w: '#EBA956' },
+  { id: 'midnightOasis', name: 'Midnight Oasis', family: 'SIG', p: '#FF7789', o: '#3AC2A7', w: '#F3C64E' },
+];
+
+const grid = document.getElementById('palette-grid');
+PALETTES.forEach(p => {
+  const btn = document.createElement('button');
+  btn.className = 'pal-chip' + (p.id === document.body.dataset.palette ? ' active' : '');
+  btn.dataset.palette = p.id;
+  btn.innerHTML = `
+    <div class="pal-swatches">
+      <div class="pal-sw" style="background: ${p.p}"></div>
+      <div class="pal-sw" style="background: ${p.o}"></div>
+      <div class="pal-sw" style="background: ${p.w}"></div>
+    </div>
+    <span class="pal-name">${p.name}</span>
+    <span class="pal-family ${p.family === 'SIG' ? 'sig' : ''}">${p.family}</span>
+  `;
+  btn.onclick = () => setPalette(p.id);
+  grid.appendChild(btn);
+});
+
+function setPalette(id) {
+  document.body.dataset.palette = id;
+  document.querySelectorAll('[data-palette]').forEach(el => {
+    if (el.tagName === 'BUTTON') el.classList.toggle('active', el.dataset.palette === id);
+  });
+  // Re-run count-up animations to reflect the palette-tinted number.
+  runCountUps();
+  // Re-run staggered entry so the whole screen greets the new palette.
+  runStagger();
+  try { localStorage.setItem('mtm.palette', id); } catch(_) {}
+}
+
+function setMode(mode) {
+  document.body.dataset.mode = mode;
+  document.getElementById('mode-light').classList.toggle('active', mode === 'light');
+  document.getElementById('mode-dark').classList.toggle('active',  mode === 'dark');
+  // Swap the in-appbar toggle icon (MtmMorphingIcon in Flutter).
+  const svg = document.getElementById('mode-icon');
+  if (mode === 'light') {
+    svg.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+  } else {
+    svg.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+  svg.animate([
+    { transform: 'rotate(-90deg) scale(0.7)', opacity: 0 },
+    { transform: 'rotate(0deg) scale(1)', opacity: 1 },
+  ], { duration: 320, easing: 'cubic-bezier(0.34, 1.28, 0.64, 1)' });
+  try { localStorage.setItem('mtm.mode', mode); } catch(_) {}
+}
+
+document.getElementById('mode-light').onclick = () => setMode('light');
+document.getElementById('mode-dark').onclick  = () => setMode('dark');
+document.getElementById('mode-toggle-inline').onclick = () => {
+  setMode(document.body.dataset.mode === 'dark' ? 'light' : 'dark');
+};
+
+// Restore last selection
+try {
+  const p = localStorage.getItem('mtm.palette');
+  const m = localStorage.getItem('mtm.mode');
+  if (p && PALETTES.find(x => x.id === p)) setPalette(p);
+  if (m === 'light' || m === 'dark') setMode(m);
+} catch(_) {}
+
+// =============================================================
+// MtmCountUp — animated integer counter
+// =============================================================
+function countUp(el, target, duration = 600) {
+  const from = parseInt(el.textContent, 10) || 0;
+  const start = performance.now();
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const v = Math.round(from + (target - from) * easeOut(t));
+    el.textContent = v;
+    if (t < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function runCountUps() {
+  countUp(document.getElementById('hero-num'), 7);
+  countUp(document.getElementById('stat-1'), 6);
+  countUp(document.getElementById('stat-2'), 3);
+}
+
+// =============================================================
+// MtmLockWindow.open — live countdown
+// =============================================================
+let normalRemaining = 47 * 60 + 12; // seconds
+let urgentRemaining = 42;
+function fmt(s) {
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+setInterval(() => {
+  if (normalRemaining > 0) normalRemaining--;
+  if (urgentRemaining > 0) urgentRemaining--; else urgentRemaining = 42;
+  document.getElementById('lock-time').textContent   = fmt(normalRemaining);
+  document.getElementById('lock-urgent').textContent = fmt(urgentRemaining);
+}, 1000);
+
+// =============================================================
+// Re-run staggered entry animation
+// =============================================================
+function runStagger() {
+  document.querySelectorAll('.stagger').forEach(el => {
+    el.style.animation = 'none';
+    void el.offsetWidth;  // force reflow
+    el.style.animation = '';
+  });
+}
+
+// Boot
+runCountUps();
+</script>
+
+</body>
+</html>

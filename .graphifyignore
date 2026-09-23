@@ -1,0 +1,17 @@
+# Keep the graph on MTM's own source and its design/handoff docs.
+
+# Generated platform scaffolding — not part of the app.
+flutter_app/android/
+flutter_app/ios/
+flutter_app/linux/
+flutter_app/web/
+flutter_app/macos/
+flutter_app/windows/
+flutter_app/build/
+flutter_app/.dart_tool/
+
+# Copied agent skills: web-oriented JS/MJS tooling, not this app's code.
+.claude/skills/
+
+# graphify's own output
+graphify-out/

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The ground of the Clean Layer mark, sampled from the artwork itself
+      (median of the tile's opaque pixels, darkened to the value the tile
+      carries at its edges) so the adaptive background and the mark read as
+      one object rather than a tile inside a tile.
+    -->
+    <color name="ic_launcher_background">#FF081F26</color>
+</resources>
