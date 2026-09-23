@@ -1,5 +1,38 @@
 # Leader (formerly MTM) Front-Back — current handoff
 
+## Current checkpoint — 2026-09-23
+
+Leader / ليدر is a runnable, Arabic-first Flutter frontend under
+`flutter_app/`. The Android application ID is `com.leader.teams`; documented
+technical `MTM` identifiers remain for compatibility. The UI quality programme
+is closed for its audited frontend scope. The later entry pass implemented the
+Login and cold-launch Intro experience, fixed brand identity, and routed Google
+sign-in through the native chooser on Android/iOS. Its detail and test coverage
+are in **THE ENTRY EXPERIENCE** near the end of this file.
+
+The latest committed frontend baseline before this repository handoff is
+`d1e49ec` on the local `sync-conflict-and-pending-work` branch. That entry
+checkpoint reported a full Flutter suite and clean analysis. For this handoff,
+the current full suite passed **2505/2505** tests and `flutter analyze` found
+no issues. One test date setup in `shift_save_persistence_test.dart` was
+corrected to step across daylight saving by calendar day, matching the
+existing production helper; no application behavior changed. Historical test
+counts below belong to their dated checkpoints.
+
+Backend contracts exist, but there is no real backend or HTTP transport in this
+repository. Start implementation with `BACKEND-HANDOFF.md` §19, then the wire
+authority in `API_CONTRACT.md`. Choose a backend stack explicitly. The seven
+live backend/data dependencies are in `DATA-NEEDS.md` §16. Device-local
+appearance and performance settings need no API. Production Google sign-in
+needs the external Android OAuth client and signing fingerprints, a Web client
+ID passed as `MTM_GOOGLE_SERVER_CLIENT_ID`, and backend verification of that
+ID token audience; see **THE ENTRY EXPERIENCE** §I and
+`BACKEND-HANDOFF.md` §19.2.
+
+The detailed history below is retained for implementation rationale. Its
+older branch, working-tree, and test-status lines describe those sessions,
+not the current checkout.
+
 Read in this order to resume:
 
 1. `CLAUDE.md`
@@ -70,9 +103,8 @@ Read in this order to resume:
    session changed its rulings)
 7. the working-tree diff (`git status`, `git diff`)
 
-Branch: `sync-conflict-and-pending-work`, working tree only — nothing
-committed for this work.
-Date: 2026-09-21.
+Historical UI-quality checkpoint date: 2026-09-21. The current source state
+is summarized above.
 
 ---
 

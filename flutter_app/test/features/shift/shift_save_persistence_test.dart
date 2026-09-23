@@ -101,7 +101,7 @@ Future<List<Shift>> _shiftsOn(
 void main() {
   testWidgets('Save writes the shift, closes the sheet, and the shift is there',
       (tester) async {
-    final day = dateOnly(DateTime.now()).add(const Duration(days: 40));
+    final day = addDays(dateOnly(DateTime.now()), 40);
     final container = await _openEditor(
       tester,
       day: day,
@@ -155,7 +155,7 @@ void main() {
   });
 
   testWidgets('a double press creates one shift, not two', (tester) async {
-    final day = dateOnly(DateTime.now()).add(const Duration(days: 41));
+    final day = addDays(dateOnly(DateTime.now()), 41);
     final container = await _openEditor(
       tester,
       day: day,
@@ -173,7 +173,7 @@ void main() {
 
   testWidgets('an empty centre is refused and nothing is written',
       (tester) async {
-    final day = dateOnly(DateTime.now()).add(const Duration(days: 42));
+    final day = addDays(dateOnly(DateTime.now()), 42);
     final container = await _openEditor(
       tester,
       day: day,
