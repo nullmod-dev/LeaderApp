@@ -10,8 +10,8 @@ import 'package:mtm/features/auth/domain/customer_demo.dart';
 import 'package:mtm/features/auth/domain/session_access.dart';
 import 'package:mtm/features/demo/domain/demo_seed.dart';
 import 'package:mtm/features/shell/main_shell.dart';
-import 'package:mtm/features/workshop/presentation/tabs/workshop_members_tab.dart';
-import 'package:mtm/features/workshop/presentation/widgets/workshop_people.dart';
+import 'package:mtm/features/workshop/presentation/tabs/workshop_team_tab.dart';
+import 'package:mtm/features/workshop/presentation/workshop_member_form_page.dart';
 import 'package:mtm/l10n/strings.dart';
 
 import '../platform/platform_harness.dart';
@@ -75,8 +75,7 @@ void main() {
 
     router.go('/detachment/${DemoSeed.cityDetachment}/shifts');
     await settlePlatform(tester);
-    expect(
-        locationOf(router), '/detachment/${DemoSeed.cityDetachment}/shifts');
+    expect(locationOf(router), '/detachment/${DemoSeed.cityDetachment}/shifts');
     expect(tester.takeException(), isNull);
 
     router.go('/detachment/${DemoSeed.cityDetachment}/storage');
@@ -91,34 +90,22 @@ void main() {
   testWidgets('workshop people can be managed inside the trial',
       (tester) async {
     final router = await bootDemo(tester);
-    router.go('/workshop/dw1/members');
+    router.go('/workshop/dw1/team');
     await settlePlatform(tester);
-    expect(find.byType(WorkshopMembersTab), findsOneWidget);
+    expect(find.byType(WorkshopTeamTab), findsOneWidget);
     expect(find.text('باسل نعمة'), findsNothing);
 
     await tester.tap(find.widgetWithText(FilledButton, S.workshopAddMember));
     await settlePlatform(tester);
+    expect(find.byType(WorkshopMemberFormPage), findsOneWidget);
     await tester.enterText(
-      find.descendant(
-        of: find.byType(WorkshopMemberPicker),
-        matching: find.byType(TextField),
-      ),
+      find.byKey(const Key('workshop-member-name')),
       'باسل نعمة',
     );
-    await settlePlatform(tester);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(WorkshopMemberPicker),
-        matching: find.byType(Checkbox),
-      ),
-    );
-    await tester.pump();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(WorkshopMemberPicker),
-        matching: find.byType(FilledButton),
-      ),
-    );
+    await tester.tap(find.descendant(
+      of: find.byType(WorkshopMemberFormPage),
+      matching: find.widgetWithText(FilledButton, S.save),
+    ));
     await settlePlatform(tester);
 
     expect(find.text('باسل نعمة'), findsOneWidget);

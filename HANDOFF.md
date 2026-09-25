@@ -10124,3 +10124,108 @@ complete; these are console/keystore facts.
   Google system sheet have not been watched on hardware.
 * **`assets/brand/mtm_logo_full.png`** is still bundled and drawn nowhere. It
   is unrelated to the selector and removing it was not part of this work.
+
+---
+
+## WORKSHOP REGISTER — «الأعضاء والزوار» (IMPLEMENTED, 2026-09-24)
+
+Implements `WorkshopUpdate.md` (decisions A1–A11) directly; no Codex hand-off.
+
+### What changed for the user
+
+* The workshop tab «الأعضاء والضيوف» is now **«الأعضاء والزوار»**, in two parts
+  picked by chips at the top: **«أعضاء الفريق (N)»** and **«المتطوعون والزوار (N)»**.
+* **«إضافة عضو»** opens a full page (`/workshop/:id/members/new`): typed
+  name → role (قائد · مدرب · دعم · إدارة · عضو, default عضو) → «دفع رسوم الورشة»
+  switch → حفظ. Nobody is picked from the roster any more.
+* A team-member row shows name, role, a green «دافع» / red «غير دافع» chip, and
+  the attendance chip. Row sheet: «سجّل الدخول» / «لن يحضر», paid / unpaid,
+  **«تعديل»** (opens `/workshop/:id/members/:pid/edit`, loaded by id), remove.
+* **Volunteers/visitors** are added from a sheet with name + paid switch; not
+  editable (remove and re-add).
+* Payment filter chips «الكل / دافع / غير دافع (N)» per part. A **free**
+  workshop (fee 0) shows no payment UI at all.
+* Statistics: payment is **binary**; «غير محدد» is gone from the dashboard,
+  detail table and exports. Organisers are **excluded** from payment counts
+  (their payment cells print «—»).
+
+### Code
+
+* `domain/workshop_models.dart` — `WorkshopRole` enum; `WorkshopParticipant.role`
+  (member only), `isPaid`; `copyWith(name, initials, role)`; tolerant `fromJson`
+  (old member line → `member`, guest → `null`).
+* `domain/workshop_repository.dart` + mock — `addTeamMember`,
+  `updateTeamMember`, `addGuestParticipant(…, paid)`. Duplicates by
+  `memberNameKey` **within one part**; update excludes itself; guest id on
+  update → `not_found`; team members still take seats (`workshop_full`).
+* `presentation/workshop_member_form_page.dart` — new page (seeds once, handles
+  loading/error/offline/not-found-or-guest, archived banner + disabled save,
+  keeps input on failure).
+* `core/router/app_router.dart` — the two routes as root-navigator siblings of
+  `':id/edit'`, before the detail `ShellRoute`, behind `workshop.people.manage`.
+* `presentation/tabs/workshop_members_tab.dart` — rebuilt around `_Part` /
+  `_PayFilter`; roster picker no longer used here.
+* `presentation/widgets/workshop_people.dart` — `WorkshopPersonActions` gains
+  `attendanceChoices` (default = organisers' four), `binaryPayment`, `onEdit`;
+  `WorkshopAttendanceChoices.register`; shared `WorkshopPaidSwitch`;
+  `askWorkshopGuestName` → `askWorkshopGuestDetails`.
+* `domain/workshop_stats.dart`, `data/workshop_stats_report.dart`,
+  `tabs/workshop_stats_tab.dart` — binary payment, organisers excluded,
+  `WorkshopRoleLabel`.
+* Seeds (`mock_workshop_repository.dart`, `demo_seed.dart`) — roles on every
+  member line, explicit paid/unpaid everywhere; `w6` still empty.
+* Strings — new `workshop*` keys; `S.absent` untouched (`S.workshopNotComing`
+  is workshop-only).
+
+### Unchanged by design
+
+Organisers tab «الفريق وأدواره» (roster picker, four attendance choices, no
+payment), `AttendanceState`, the roster, shifts, `addMemberParticipants`
+(kept for compatibility).
+
+### Docs
+
+`API_CONTRACT.md` → `WorkshopParticipant` + `addTeamMember` /
+`updateTeamMember` / `addGuestParticipant(paid)`; `BACKEND-HANDOFF.md` §6.3
+Workshops row.
+
+## WORKSHOP REGISTER — team and volunteers on separate tabs (IMPLEMENTED, 2026-09-25)
+
+Follow-up to the section above, at Ahmed's request. It supersedes that
+section's "two parts" and "Unchanged by design: organisers tab" lines.
+
+### What changed for the user
+
+* **«الفريق وأدواره»** now holds the workshop's own **team members**. Its
+  **«إضافة عضو»** opens the typed page (`/workshop/:id/members/new`: name →
+  role → paid). The roster picker is **removed**, and so is «إضافة منظِّم».
+* **«المتطوعون والزوار»** (the tab was «الأعضاء والزوار») holds only volunteers
+  and visitors. Its **«إضافة متطوع»** (key `workshop-add-volunteer`) opens the
+  same full page at `/workshop/:id/volunteers/new`, with name + paid and no
+  role. The bottom sheet is gone.
+* The part chips are gone, because each tab is now one part. Search, the
+  «الكل / دافع / غير دافع (N)» filter, the row, and the «سجّل الدخول» / «لن يحضر»
+  sheet are the same on both tabs.
+* **Organisers already on a workshop** (roster-linked, `organizingTeam`) still
+  show under the team members, below a «المنظِّمون» heading. They can be
+  checked in or removed, but no new one can be added. The heading is hidden
+  when there are none.
+
+### Code
+
+* `tabs/workshop_members_tab.dart`: `WorkshopRegisterView(kind, footer)` is
+  the shared list. `WorkshopMembersTab` is its volunteer half.
+* `tabs/workshop_team_tab.dart`: `WorkshopTeamTab` is the team-member half,
+  with a `_Organisers` footer.
+* `workshop_member_form_page.dart`: `volunteer: true` mode calls
+  `addGuestParticipant(…, paid:)`.
+* `app_router.dart`: the `':id/volunteers/new'` route, a root-navigator page
+  behind `workshop.people.manage`.
+* Removed: `pickWorkshopMembers`, `WorkshopMemberPicker`,
+  `workshopCandidatesProvider`, `askWorkshopGuestDetails`, and the
+  `workshopPick*`, `workshopAddOrganizer`, `workshopAddGuest` and
+  `emptyWorkshopTeam*` strings. The repository's `addOrganizers` /
+  `addMemberParticipants` stay, as API and backend contract.
+* `test/core/widgets/animated_tab_bar_test.dart` now loads IBM Plex Sans
+  Arabic. The default test font drew «المتطوعون والزوار» wider than 320dp;
+  the real font draws it at 192dp at 1.6×.

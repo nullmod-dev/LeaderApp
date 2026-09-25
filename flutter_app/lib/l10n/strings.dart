@@ -60,7 +60,7 @@ abstract final class S {
 
   // ---------- Workshop tabs ----------
   static const workshopTeam = 'الفريق وأدواره';
-  static const workshopMembers = 'الأعضاء والضيوف';
+  static const workshopMembers = 'المتطوعون والزوار';
   static const workshopStats = 'الإحصائيات';
 
   // ---------- Auth ----------
@@ -1260,22 +1260,22 @@ abstract final class S {
   // ---- Workshop statistics (dashboard, detail, export) ----
   static const workshopStatsTitle = 'إحصائيات الورشة';
   static const workshopStatsSubtitle = 'تقرير الأداء والحضور';
-  static const statsGroupParticipants = 'طلاب/ضيوف';
+  static const statsGroupParticipants = 'الأعضاء والزوار';
   static const statsGroupTeam = 'الفريق';
   static const statsAttendanceSection = 'معدلات الحضور';
   static const statsFinanceSection = 'الملخص المالي';
   static const statsDetailSection = 'التفصيل';
   static const statsPresentAbsent = 'حاضر / غائب';
   static const statsPayers = 'الدافعون';
-  static const statsNonPayers = 'غير دافع/غير محدد';
+  static const statsNonPayers = 'غير دافع';
   static const statsTotalCollected = 'الإجمالي';
   static const statsRegistrationFee = 'رسم الاشتراك';
   static const statsFreeWorkshop = 'ورشة مجانية — لا رسم اشتراك';
   static const paymentPaid = 'دافع';
   static const paymentUnpaid = 'غير دافع';
   static const paymentUnspecified = 'غير محدد';
-  static const participantGuest = 'ضيف';
-  static const participantMember = 'متطوع';
+  static const participantGuest = 'زائر/متطوع';
+  static const participantMember = 'عضو فريق';
   static const currencyUnit = 'ل.س';
   static const statsColCategory = 'الفئة';
   static const statsColPresent = 'الحاضر';
@@ -1566,40 +1566,51 @@ abstract final class S {
   static const pickTime = 'اختيار الوقت';
 
   // Workshop tabs
-  static const emptyWorkshopTeam = 'لا فريق منظِّم لهذه الورشة.';
-  static const emptyWorkshopTeamSub = 'أضف منظِّما ليظهر هنا.';
-  static const emptyParticipants = 'لا مشاركين مسجّلين.';
-  static const emptyParticipantsSub = 'أضف عضوا أو ضيفا لتبدأ تسجيل الحضور.';
+  static const emptyParticipants = 'لا أعضاء في فريق الورشة بعد.';
+  static const emptyParticipantsSub =
+      'أضف عضوا بالاسم والدور لتبدأ تسجيل الحضور والدفع.';
+  static const emptyWorkshopVisitors = 'لا متطوعين ولا زوار بعد.';
+  static const emptyWorkshopVisitorsSub =
+      'أضف متطوعا أو زائرا من خارج الفريق بالاسم فقط.';
   static const searchWorkshopParticipants = 'ابحث عن مشارك';
   static const noMatchingWorkshopParticipants = 'لا مشاركين يطابقون البحث.';
   static const noMatchingWorkshopParticipantsSub =
-      'جرّب اسما آخر، أو اعرض كل الأعضاء والضيوف.';
+      'جرّب اسما آخر، أو امسح تصفية الدفع.';
   static const clearWorkshopParticipantFilters = 'مسح البحث والتصفية';
   static const addParticipant = 'أضف مشاركا';
   static const kindMember = 'عضو';
-  static const kindGuest = 'ضيف';
+  static const kindGuest = 'زائر/متطوع';
   static const totalParticipants = 'إجمالي المشاركين';
   static const workshopAddMember = 'إضافة عضو';
-  static const workshopAddGuest = 'إضافة ضيف';
-  static const workshopAddOrganizer = 'إضافة منظِّم';
-  static const workshopPickMembersTitle = 'إضافة أعضاء إلى الورشة';
-  static const workshopPickOrganizersTitle = 'إضافة إلى الفريق المنظِّم';
-  static const workshopPickSearch = 'ابحث بالاسم أو القسم أو المفرزة';
-  static const workshopPickNone = 'لا أعضاء في الفريق بعد.';
-  static const workshopPickNoneSub =
-      'أضف أعضاء إلى إحدى المفارز أولا، ثم عد لتسجيلهم في الورشة.';
-  static const workshopPickNoMatch = 'لا أحد يطابق البحث.';
-  static const workshopPickAlreadyParticipant = 'مسجّل';
-  static const workshopPickAlreadyOrganizer = 'منظِّم';
-  static const workshopPickNoSeats = 'لا مقاعد متبقية في الورشة.';
-  static const workshopPickConfirm = 'إضافة';
-  static const workshopPickEmptySelection = 'اختر عضوا واحدا على الأقل';
+  static const workshopAddVolunteer = 'إضافة متطوع';
+  static const workshopOrganizersSection = 'المنظِّمون';
   static const workshopSeatsTaken = 'مقعدا مشغولا من';
-  static const workshopGuestName = 'اسم الضيف';
+  static const workshopGuestName = 'الاسم';
   static const workshopGuestNameHint = 'الاسم الكامل كما يُكتب في الشهادة';
   static const workshopPersonActions = 'الحضور والدفع';
   static const workshopPaymentSection = 'الدفع';
   static const workshopAttendanceSection = 'الحضور';
+
+  // Workshop register — team members and volunteers/visitors
+  static const workshopTeamMembersPart = 'أعضاء الفريق';
+  static const workshopVisitorsPart = 'المتطوعون والزوار';
+  static const workshopMemberFormNew = 'إضافة عضو للورشة';
+  static const workshopMemberFormEdit = 'تعديل العضو';
+  static const workshopMemberName = 'الاسم';
+  static const workshopMemberNameHint = 'الاسم الكامل';
+  static const workshopMemberRole = 'الدور';
+  static const workshopRoleLeader = 'قائد';
+  static const workshopRoleTrainer = 'مدرب';
+  static const workshopRoleSupport = 'دعم';
+  static const workshopRoleManagement = 'إدارة';
+  static const workshopRoleMember = 'عضو';
+  static const workshopPaidSwitch = 'دفع رسوم الورشة';
+  static const workshopNotComing = 'غائب';
+  static const workshopUnpaidCount = 'لم يدفعوا';
+  static const workshopEditMember = 'تعديل';
+  static const workshopMemberNotFound = 'لم يعد هذا العضو في سجل الورشة.';
+  static const workshopMemberNotFoundSub =
+      'ربما أُزيل أو كان زائرا أو متطوعا. عد إلى القائمة وحدّثها.';
   static const workshopRemoveParticipant = 'إزالة من الورشة';
   static const workshopRemoveOrganizer = 'إزالة من الفريق المنظِّم';
   static const workshopRemoveConfirmTitle = 'إزالة من الورشة؟';
@@ -1607,9 +1618,9 @@ abstract final class S {
   static const workshopRemoveOrganizerBody =
       'يُحذف من الفريق المنظِّم لهذه الورشة فقط، ويبقى عضوا في الفريق.';
   static const workshopRemoveMemberBody =
-      'يُحذف من سجل هذه الورشة فقط، ويبقى عضوا في الفريق.';
+      'يُحذف العضو ودوره وحضوره ودفعه من سجل هذه الورشة.';
   static const workshopRemoveGuestBody =
-      'يُحذف الضيف وحضوره ودفعه من سجل هذه الورشة.';
+      'يُحذف الزائر أو المتطوع وحضوره ودفعه من سجل هذه الورشة.';
   static const workshopRemove = 'إزالة';
   static const workshopRemoved = 'أُزيل من الورشة.';
   static const workshopAdded = 'تمت الإضافة إلى الورشة.';

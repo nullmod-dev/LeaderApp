@@ -43,12 +43,37 @@ abstract class WorkshopRepository {
     List<String> memberIds,
   );
 
-  /// Registers somebody from outside the team by name. Fails with
-  /// `duplicate` when a guest of the same name is already registered.
+  /// Adds one of the workshop's own team members: a typed name, a role, and
+  /// whether they paid. Fails with `not_found`, `archived`, `validation` (an
+  /// empty name), `duplicate` (the same name already among this workshop's
+  /// team members) or `workshop_full`.
+  Future<Result<WorkshopParticipant>> addTeamMember(
+    String workshopId, {
+    required String name,
+    required WorkshopRole role,
+    required bool paid,
+  });
+
+  /// Edits a team member's name, role and payment. Fails with `not_found`
+  /// (also when the line is a volunteer/visitor), `archived`, `validation`,
+  /// or `duplicate` (another team member already has the name — the line
+  /// itself never counts).
+  Future<Result<WorkshopParticipant>> updateTeamMember(
+    String participantId, {
+    required String name,
+    required WorkshopRole role,
+    required bool paid,
+  });
+
+  /// Registers a volunteer or visitor — somebody who is not a team member —
+  /// by name, and whether they paid. Fails with `validation`, `duplicate`
+  /// when a volunteer/visitor of the same name is already registered, or
+  /// `workshop_full`.
   Future<Result<WorkshopParticipant>> addGuestParticipant(
     String workshopId,
-    String name,
-  );
+    String name, {
+    bool paid = false,
+  });
 
   /// Takes one line off the register. The roster is untouched.
   Future<Result<void>> removeParticipant(String participantId);

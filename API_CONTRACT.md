@@ -2664,8 +2664,8 @@ and on its register, must be refused with `archived`.
   "name": "Participant name",
   "initials": "PN",
   "kind": "member",
-  "memberId": "m_123",
-  "attendance": "notInvited",
+  "role": "trainer",
+  "attendance": "notCheckedIn",
   "paymentStatus": "paid"
 }
 ```
@@ -2673,14 +2673,24 @@ and on its register, must be refused with `archived`.
 `kind` is one of `member`, `guest`. `attendance` uses the `TeamMember`
 attendance values.
 
-`memberId` is the roster member this line refers to. It is **required for
-`kind: "member"`** and absent for a guest; `name` and `initials` are a display
-snapshot taken when the person was registered, so a later rename or roster
-deletion leaves the register readable. Clients may still receive an older
-member line without `memberId`.
+**Workshop register rework (2026-09-24).** Every workshop owns its own people;
+nobody is picked from the roster or shared between workshops.
 
-`paymentStatus` is `paid`, `unpaid`, or **absent** — and absent is a third
-meaningful state, "not recorded yet". It must never be serialized as `unpaid`.
+- `kind: "member"` is one of the workshop's **team members**: a name typed by
+  hand plus a `role`. `kind: "guest"` is a **volunteer or visitor** — not a
+  team member, known by name only. The wire value `guest` is unchanged.
+- `role` is one of `leader`, `trainer`, `support`, `management`, `member`,
+  serialized by name. It is **present only for `kind: "member"`** and never
+  sent for a guest. A client reading a member line with no `role` (an old
+  record) or an unknown value treats it as `member`.
+- `memberId` survives only on **old** roster-linked member lines. New lines
+  never carry it.
+
+`paymentStatus` is `paid` or `unpaid`, and **binary** for every new record:
+the server writes one of the two explicitly on create. Old records may still
+arrive with it absent; the client shows and counts an absent value as
+**unpaid**. The organising team carries no payment and is excluded from
+payment counts.
 
 ### HomeDecisionItem
 
@@ -4126,6 +4136,10 @@ Errors: `archived`.
 
 #### `WorkshopRepository.addMemberParticipants`
 
+> **Legacy.** Since the 2026-09-24 register rework the Members tab no longer
+> registers roster members; team members are typed by name
+> (`addTeamMember`). The endpoint stays for compatibility.
+
 `POST /api/v1/workshops/{workshopId}/participants` — access bearer required,
 `workshop.people.manage`
 
@@ -4145,6 +4159,40 @@ Response `201`: JSON array of the created `WorkshopParticipant` objects.
 workshop's organising team), `workshop_full` (more people than free seats),
 `archived`. Repeated ids in one request collapse to one registration.
 
+#### `WorkshopRepository.addTeamMember`
+
+`POST /api/v1/workshops/{workshopId}/team-members` — access bearer required,
+`workshop.people.manage`
+
+Request:
+
+```json
+{
+  "name": "Member name",
+  "role": "trainer",
+  "paid": true
+}
+```
+
+Response `201`: `WorkshopParticipant` JSON with `kind: "member"`, the `role`,
+`attendance: "notCheckedIn"` and `paymentStatus` `paid`/`unpaid`, no
+`memberId`. The server normalizes the name (trim, collapse spaces) and derives
+`initials`. Errors: `validation` (empty name, unknown role), `duplicate` (the
+same normalized name already among this workshop's **team members** — a
+volunteer/visitor of the same name does not collide), `workshop_full`
+(team members take seats), `archived`, `not_found`.
+
+#### `WorkshopRepository.updateTeamMember`
+
+`PUT /api/v1/workshop-participants/{participantId}` — access bearer
+required, `workshop.people.manage`
+
+Request: the same body as `addTeamMember`. Response `200`: updated
+`WorkshopParticipant` JSON; attendance is untouched. Errors: `not_found`
+(unknown id, **or the line is a `guest`** — volunteers/visitors are not
+editable), `validation`, `duplicate` (another team member already has the
+name; the line itself never collides), `archived`.
+
 #### `WorkshopRepository.addGuestParticipant`
 
 `POST /api/v1/workshops/{workshopId}/guests` — access bearer required,
@@ -4154,13 +4202,16 @@ Request:
 
 ```json
 {
-  "name": "Guest name"
+  "name": "Volunteer or visitor name",
+  "paid": false
 }
 ```
 
-Response `201`: `WorkshopParticipant` JSON with `kind: "guest"` and no
-`memberId`. Errors: `validation` (empty name), `duplicate` (a guest of the
-same normalized name is already registered), `workshop_full`, `archived`.
+`paid` is optional and defaults to `false`. Response `201`:
+`WorkshopParticipant` JSON with `kind: "guest"`, no `role`, no `memberId`,
+and `paymentStatus` `paid`/`unpaid`. Errors: `validation` (empty name),
+`duplicate` (a volunteer/visitor of the same normalized name is already
+registered), `workshop_full`, `archived`.
 
 #### `WorkshopRepository.removeParticipant`
 
@@ -4184,8 +4235,9 @@ Request:
 }
 ```
 
-`paymentStatus` is `paid`, `unpaid`, or `null` to return the line to "not
-recorded". Response `200`: updated `WorkshopParticipant` JSON.
+`paymentStatus` is `paid` or `unpaid`; the register UI no longer sends `null`
+(payment is binary since the 2026-09-24 rework), though the server may still
+accept it for compatibility. Response `200`: updated `WorkshopParticipant` JSON.
 Errors: `archived`.
 
 #### `WorkshopRepository.addOrganizers`

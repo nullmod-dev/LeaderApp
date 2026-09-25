@@ -265,11 +265,11 @@ abstract final class DemoSeed {
       ];
 
   static List<WorkshopParticipant> workshopParticipants() => [
-        _participant('dp1', 'dw1', 'dm2', 'لينا الخوري',
+        _participant('dp1', 'dw1', 'dm2', 'لينا الخوري', WorkshopRole.leader,
             AttendanceState.notCheckedIn, PaymentStatus.paid),
-        _participant('dp2', 'dw1', 'dm3', 'كرم الدين',
-            AttendanceState.notCheckedIn, null),
-        _participant('dp3', 'dw1', 'dm8', 'ديما عقيل',
+        _participant('dp2', 'dw1', 'dm3', 'كرم الدين', WorkshopRole.trainer,
+            AttendanceState.notCheckedIn, PaymentStatus.unpaid),
+        _participant('dp3', 'dw1', 'dm8', 'ديما عقيل', WorkshopRole.member,
             AttendanceState.notCheckedIn, PaymentStatus.unpaid),
         const WorkshopParticipant(
           id: 'dp4',
@@ -280,12 +280,12 @@ abstract final class DemoSeed {
           attendance: AttendanceState.notCheckedIn,
           paymentStatus: PaymentStatus.paid,
         ),
-        _participant('dp5', 'dw2', 'dm9', 'زياد الأسمر',
+        _participant('dp5', 'dw2', 'dm9', 'زياد الأسمر', WorkshopRole.leader,
             AttendanceState.checkedIn, PaymentStatus.paid),
-        _participant('dp6', 'dw2', 'dm10', 'نغم قاسم', AttendanceState.absent,
-            PaymentStatus.unpaid),
-        _participant('dp7', 'dw2', 'dm4', 'هدى مرعي', AttendanceState.checkedIn,
-            PaymentStatus.paid),
+        _participant('dp6', 'dw2', 'dm10', 'نغم قاسم', WorkshopRole.support,
+            AttendanceState.absent, PaymentStatus.unpaid),
+        _participant('dp7', 'dw2', 'dm4', 'هدى مرعي', WorkshopRole.trainer,
+            AttendanceState.checkedIn, PaymentStatus.paid),
       ];
 
   static WorkshopParticipant _participant(
@@ -293,8 +293,9 @@ abstract final class DemoSeed {
     String workshopId,
     String memberId,
     String name,
+    WorkshopRole role,
     AttendanceState attendance,
-    PaymentStatus? payment,
+    PaymentStatus payment,
   ) =>
       WorkshopParticipant(
         id: id,
@@ -303,6 +304,7 @@ abstract final class DemoSeed {
         name: name,
         initials: TeamMember.initialsOf(name),
         kind: ParticipantKind.member,
+        role: role,
         attendance: attendance,
         paymentStatus: payment,
       );

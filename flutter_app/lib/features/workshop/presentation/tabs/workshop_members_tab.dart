@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/access/capability.dart';
 import '../../../../core/access/capability_guard.dart';
@@ -24,25 +25,53 @@ import '../../domain/workshop_models.dart';
 import '../../domain/workshop_stats.dart';
 import '../widgets/workshop_people.dart';
 
-enum _ParticipantFilter { all, members, guests }
+enum _PayFilter { all, paid, unpaid }
 
-/// The workshop's register: members of the team and guests from outside it.
-///
-/// Members are added from the tenant's roster by id; guests by name. Taking
-/// somebody off the register never touches the roster. Every control is gated
-/// on its own `workshop.*` key and closed while the workshop is archived.
-class WorkshopMembersTab extends ConsumerStatefulWidget {
+/// The «المتطوعون والزوار» tab: the volunteers and visitors, who are not team
+/// members and are known only by name. The workshop's own team members live
+/// on the «الفريق وأدواره» tab (`WorkshopTeamTab`).
+class WorkshopMembersTab extends StatelessWidget {
   const WorkshopMembersTab({super.key, required this.workshopId});
 
   final String workshopId;
 
   @override
-  ConsumerState<WorkshopMembersTab> createState() => _WorkshopMembersTabState();
+  Widget build(BuildContext context) => WorkshopRegisterView(
+        workshopId: workshopId,
+        kind: ParticipantKind.guest,
+      );
 }
 
-class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
+/// One half of the workshop's register — its team members (typed by name,
+/// each with a role) or its volunteers and visitors — listed with search,
+/// the paid/unpaid filter and the attendance / payment sheet.
+///
+/// Both halves are added on a full page: «إضافة عضو» for a team member,
+/// «إضافة متطوع» for a volunteer. Nobody here is picked from the roster or
+/// shared with another workshop. Every control is gated on its own
+/// `workshop.*` key and closed while the workshop is archived. A free
+/// workshop shows no payment at all. [footer] follows the list — the team
+/// tab puts the workshop's organisers there.
+class WorkshopRegisterView extends ConsumerStatefulWidget {
+  const WorkshopRegisterView({
+    super.key,
+    required this.workshopId,
+    required this.kind,
+    this.footer,
+  });
+
+  final String workshopId;
+  final ParticipantKind kind;
+  final Widget? footer;
+
+  @override
+  ConsumerState<WorkshopRegisterView> createState() =>
+      _WorkshopRegisterViewState();
+}
+
+class _WorkshopRegisterViewState extends ConsumerState<WorkshopRegisterView> {
   final _search = TextEditingController();
-  _ParticipantFilter _filter = _ParticipantFilter.all;
+  _PayFilter _pay = _PayFilter.all;
   String _query = '';
 
   @override
@@ -68,6 +97,12 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
     );
   }
 
+  void _clearFilters() => setState(() {
+        _query = '';
+        _search.clear();
+        _pay = _PayFilter.all;
+      });
+
   Widget _content(
     BuildContext context,
     List<WorkshopParticipant> participants,
@@ -86,23 +121,28 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                 offline: (cached) => cached,
               ),
             );
+    // Until the workshop is read its fee is unknown; payment stays hidden
+    // rather than flashing in and out.
+    final paying = (workshop?.registrationFee ?? 0) > 0;
 
-    final byKind = switch (_filter) {
-      _ParticipantFilter.all => participants,
-      _ParticipantFilter.members =>
-        participants.where((p) => p.kind == ParticipantKind.member).toList(),
-      _ParticipantFilter.guests =>
-        participants.where((p) => p.kind == ParticipantKind.guest).toList(),
-    };
+    final team = widget.kind == ParticipantKind.member;
+    final inPart = participants.where((p) => p.kind == widget.kind).toList();
+    final unpaidInPart = inPart.where((p) => !p.isPaid).length;
+
+    final byPay = !paying
+        ? inPart
+        : switch (_pay) {
+            _PayFilter.all => inPart,
+            _PayFilter.paid => inPart.where((p) => p.isPaid).toList(),
+            _PayFilter.unpaid => inPart.where((p) => !p.isPaid).toList(),
+          };
     final needle = memberSearchKey(_query);
     final filtered = needle.isEmpty
-        ? byKind
-        : byKind
+        ? byPay
+        : byPay
             .where((participant) =>
                 memberSearchKey(participant.name).contains(needle))
             .toList();
-    final guests =
-        participants.where((p) => p.kind == ParticipantKind.guest).length;
 
     return FloatingNavPadding(
       child: ListView(
@@ -117,15 +157,14 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                 child: StaleBadge(),
               ),
             ),
-          // The count first: how full the workshop is, and how many of those
-          // are guests, is what someone opening the register wants to know.
+          // How full the workshop is comes first: everyone on the register,
+          // team members and volunteers alike, takes a seat.
           AppMeta(
             semanticsLabel: workshop == null
                 ? '${S.totalParticipants}: ${AppNumber.count(participants.length)}'
                 : '${AppNumber.count(participants.length)} '
                     '${S.workshopSeatsTaken} '
-                    '${AppNumber.count(workshop.capacity)}، '
-                    '${S.guests} ${AppNumber.count(guests)}',
+                    '${AppNumber.count(workshop.capacity)}',
             parts: [
               if (workshop == null)
                 AppMetaText.total(S.totalParticipants, participants.length,
@@ -137,30 +176,31 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                   '${AppNumber.count(workshop.capacity)}',
                   emphasis: true,
                 ),
-              AppMetaText.count(guests, label: S.guests),
             ],
           ),
           if (canManage) ...[
             const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _addMembers(participants, workshop),
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text(S.workshopAddMember),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _addGuest,
-                  icon: const Icon(Icons.badge_outlined),
-                  label: const Text(S.workshopAddGuest),
-                ),
-              ],
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: team
+                  ? FilledButton.icon(
+                      key: const Key('workshop-add-member'),
+                      onPressed: () => context
+                          .push('/workshop/${widget.workshopId}/members/new'),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text(S.workshopAddMember),
+                    )
+                  : FilledButton.icon(
+                      key: const Key('workshop-add-volunteer'),
+                      onPressed: () => context.push(
+                          '/workshop/${widget.workshopId}/volunteers/new'),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text(S.workshopAddVolunteer),
+                    ),
             ),
           ],
           const SizedBox(height: AppSpacing.lg),
-          if (participants.isNotEmpty) ...[
+          if (inPart.isNotEmpty) ...[
             TextField(
               key: const Key('workshop-participants-search'),
               controller: _search,
@@ -181,51 +221,55 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                       ),
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            AppFilterBar(
-              semanticLabel: S.filterByStatus,
-              children: [
-                AppFilterChip(
-                  label: S.filterAll,
-                  selected: _filter == _ParticipantFilter.all,
-                  onSelected: (_) =>
-                      setState(() => _filter = _ParticipantFilter.all),
-                ),
-                AppFilterChip(
-                  label: S.filterMembers,
-                  selected: _filter == _ParticipantFilter.members,
-                  onSelected: (_) =>
-                      setState(() => _filter = _ParticipantFilter.members),
-                ),
-                AppFilterChip(
-                  label: S.filterGuests,
-                  selected: _filter == _ParticipantFilter.guests,
-                  onSelected: (_) =>
-                      setState(() => _filter = _ParticipantFilter.guests),
-                ),
-              ],
-            ),
+            if (paying) ...[
+              const SizedBox(height: AppSpacing.sm),
+              AppFilterBar(
+                semanticLabel: S.workshopPaymentSection,
+                children: [
+                  AppFilterChip(
+                    label: S.filterAll,
+                    selected: _pay == _PayFilter.all,
+                    onSelected: (_) => setState(() => _pay = _PayFilter.all),
+                  ),
+                  AppFilterChip(
+                    label: S.paymentPaid,
+                    selected: _pay == _PayFilter.paid,
+                    onSelected: (_) => setState(() => _pay = _PayFilter.paid),
+                  ),
+                  AppFilterChip(
+                    key: const Key('workshop-filter-unpaid'),
+                    label: '${S.paymentUnpaid} '
+                        '(${AppNumber.count(unpaidInPart)})',
+                    selected: _pay == _PayFilter.unpaid,
+                    onSelected: (_) => setState(() => _pay = _PayFilter.unpaid),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
           ],
           if (filtered.isEmpty)
-            participants.isEmpty
-                ? const EmptyState(
-                    key: Key('workshop-participants-empty'),
-                    icon: Icons.people_outline_rounded,
-                    title: S.emptyParticipants,
-                    body: S.emptyParticipantsSub,
-                  )
+            inPart.isEmpty
+                ? (team
+                    ? const EmptyState(
+                        key: Key('workshop-participants-empty'),
+                        icon: Icons.people_outline_rounded,
+                        title: S.emptyParticipants,
+                        body: S.emptyParticipantsSub,
+                      )
+                    : const EmptyState(
+                        key: Key('workshop-visitors-empty'),
+                        icon: Icons.badge_outlined,
+                        title: S.emptyWorkshopVisitors,
+                        body: S.emptyWorkshopVisitorsSub,
+                      ))
                 : EmptyState(
                     key: const Key('workshop-participants-no-results'),
                     icon: Icons.search_off_rounded,
                     title: S.noMatchingWorkshopParticipants,
                     body: S.noMatchingWorkshopParticipantsSub,
                     actionLabel: S.clearWorkshopParticipantFilters,
-                    onAction: () => setState(() {
-                      _query = '';
-                      _search.clear();
-                      _filter = _ParticipantFilter.all;
-                    }),
+                    onAction: _clearFilters,
                   )
           else ...[
             for (int i = 0; i < filtered.length; i++) ...[
@@ -233,12 +277,13 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                 index: i,
                 child: _ParticipantCard(
                   participant: filtered[i],
-                  onTap: (canManage || canAttend || canPay)
+                  showPayment: paying,
+                  onTap: (canManage || canAttend || (canPay && paying))
                       ? () => _personSheet(
                             filtered[i],
                             canManage: canManage,
                             canAttend: canAttend,
-                            canPay: canPay,
+                            canPay: canPay && paying,
                           )
                       : null,
                 ),
@@ -247,48 +292,10 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
                 const SizedBox(height: AppSpacing.sm),
             ],
           ],
+          if (widget.footer != null) widget.footer!,
         ],
       ),
     );
-  }
-
-  Future<void> _addMembers(
-    List<WorkshopParticipant> participants,
-    Workshop? workshop,
-  ) async {
-    final ids = await pickWorkshopMembers(
-      context,
-      title: S.workshopPickMembersTitle,
-      registeredIds: {
-        for (final p in participants)
-          if (p.memberId != null) p.memberId!,
-      },
-      organizerIds: {
-        for (final m in workshop?.organizingTeam ?? const <TeamMember>[]) m.id,
-      },
-      seatsLeft: workshop == null
-          ? null
-          : (workshop.capacity - participants.length)
-              .clamp(0, workshop.capacity),
-    );
-    if (ids == null || ids.isEmpty || !mounted) return;
-    final result = await ref
-        .read(workshopRepositoryProvider)
-        .addMemberParticipants(widget.workshopId, ids);
-    if (!mounted) return;
-    refreshWorkshop(ref, widget.workshopId);
-    reportWorkshopResult(context, result, success: S.workshopAdded);
-  }
-
-  Future<void> _addGuest() async {
-    final name = await askWorkshopGuestName(context);
-    if (name == null || name.isEmpty || !mounted) return;
-    final result = await ref
-        .read(workshopRepositoryProvider)
-        .addGuestParticipant(widget.workshopId, name);
-    if (!mounted) return;
-    refreshWorkshop(ref, widget.workshopId);
-    reportWorkshopResult(context, result, success: S.workshopAdded);
   }
 
   Future<void> _personSheet(
@@ -317,15 +324,27 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
       child: Builder(
         builder: (sheetContext) => WorkshopPersonActions(
           attendance: participant.attendance,
+          attendanceChoices: WorkshopAttendanceChoices.register,
           onAttendance: canAttend
               ? (state) => apply(sheetContext,
                   () => repo.setParticipantAttendance(participant.id, state))
               : null,
           payment: participant.paymentStatus,
+          binaryPayment: true,
           onPayment: canPay
               ? (status) => apply(sheetContext,
                   () => repo.setParticipantPayment(participant.id, status))
               : null,
+          // Only a team member has a role and a page; a volunteer or visitor
+          // is removed and added again.
+          onEdit: canManage && participant.kind == ParticipantKind.member
+              ? () {
+                  Navigator.of(sheetContext).pop();
+                  context.push('/workshop/${widget.workshopId}'
+                      '/members/${participant.id}/edit');
+                }
+              : null,
+          editLabel: S.workshopEditMember,
           removeLabel: S.workshopRemoveParticipant,
           onRemove: canManage
               ? () async {
@@ -355,9 +374,14 @@ class _WorkshopMembersTabState extends ConsumerState<WorkshopMembersTab> {
 }
 
 class _ParticipantCard extends StatelessWidget {
-  const _ParticipantCard({required this.participant, required this.onTap});
+  const _ParticipantCard({
+    required this.participant,
+    required this.showPayment,
+    required this.onTap,
+  });
 
   final WorkshopParticipant participant;
+  final bool showPayment;
   final VoidCallback? onTap;
 
   @override
@@ -365,20 +389,33 @@ class _ParticipantCard extends StatelessWidget {
     final (attendanceKind, attendanceLabel) = switch (participant.attendance) {
       AttendanceState.checkedIn => (StatusKind.ok, S.checkedIn),
       AttendanceState.checkedOut => (StatusKind.info, S.checkedOut),
-      AttendanceState.absent => (StatusKind.crit, S.absent),
+      AttendanceState.absent => (StatusKind.crit, S.workshopNotComing),
       AttendanceState.notCheckedIn => (StatusKind.muted, S.notCheckedIn),
     };
+    final member = participant.kind == ParticipantKind.member;
     return WorkshopPersonRow(
       initials: participant.initials,
-      guest: participant.kind == ParticipantKind.guest,
+      guest: !member,
       name: participant.name,
-      context_: AppMeta(parts: [
-        AppMetaText(participant.kind == ParticipantKind.member
-            ? S.kindMember
-            : S.kindGuest),
-        if (participant.paymentStatus != null)
-          AppMetaText(participant.paymentStatus.label),
-      ]),
+      // The payment chip rides on the context line, never beside the
+      // attendance chip: two trailing chips do not fit at 320dp.
+      context_: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          AppMeta(parts: [
+            AppMetaText(member
+                ? (participant.role ?? WorkshopRole.member).label
+                : S.kindGuest),
+          ]),
+          if (showPayment)
+            StatusChip(
+              kind: participant.isPaid ? StatusKind.ok : StatusKind.crit,
+              label: participant.isPaid ? S.paymentPaid : S.paymentUnpaid,
+            ),
+        ],
+      ),
       trailing: StatusChip(kind: attendanceKind, label: attendanceLabel),
       onTap: onTap,
     );

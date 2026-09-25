@@ -148,12 +148,15 @@ class _AttendanceSection extends StatelessWidget {
             child: _DonutMetric(
               label: S.statsGroupParticipants,
               group: stats.participantStats,
+              showPayment: !stats.isFree,
             ),
           ),
+          // Organisers never pay, so their donut carries no payment line.
           Expanded(
             child: _DonutMetric(
               label: S.statsGroupTeam,
               group: stats.teamStats,
+              showPayment: false,
             ),
           ),
         ],
@@ -163,10 +166,15 @@ class _AttendanceSection extends StatelessWidget {
 }
 
 class _DonutMetric extends StatelessWidget {
-  const _DonutMetric({required this.label, required this.group});
+  const _DonutMetric({
+    required this.label,
+    required this.group,
+    required this.showPayment,
+  });
 
   final String label;
   final WorkshopGroupStats group;
+  final bool showPayment;
 
   @override
   Widget build(BuildContext context) {
@@ -190,14 +198,15 @@ class _DonutMetric extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TextStyle(color: c.ink3, fontSize: 12),
       ),
-      const SizedBox(height: 2),
-      AppMeta(
-        parts: [
-          AppMetaText.count(group.paid, label: S.paymentPaid),
-          AppMetaText.count(group.unpaid, label: S.paymentUnpaid),
-          AppMetaText.count(group.unspecified, label: S.paymentUnspecified),
-        ],
-      ),
+      if (showPayment) ...[
+        const SizedBox(height: 2),
+        AppMeta(
+          parts: [
+            AppMetaText.count(group.paid, label: S.paymentPaid),
+            AppMetaText.count(group.unpaid, label: S.paymentUnpaid),
+          ],
+        ),
+      ],
     ]);
   }
 }
@@ -328,8 +337,7 @@ class _FinanceSection extends StatelessWidget {
                 child: _FinanceTile(
                   icon: Icons.pending_outlined,
                   label: S.statsNonPayers,
-                  value: toArabicIndic(
-                      '${stats.unpaidCount + stats.unspecifiedCount}'),
+                  value: toArabicIndic('${stats.unpaidCount}'),
                   caption: '${S.statsRegistrationFee}: '
                       '${formatWorkshopAmount(stats.registrationFee)}',
                   tone: _Tone.warn,
@@ -408,7 +416,7 @@ class _FinanceTile extends StatelessWidget {
   }
 }
 
-/// The exact counts, in the same six columns the exported summary uses — so
+/// The exact counts, in the same five columns the exported summary uses — so
 /// what somebody reads on screen is literally the table they will get in the
 /// file.
 class _DetailSection extends StatelessWidget {
@@ -429,7 +437,6 @@ class _DetailSection extends StatelessWidget {
             S.statsColAbsent,
             S.paymentPaid,
             S.paymentUnpaid,
-            S.paymentUnspecified,
           ],
           header: true,
         ),
@@ -437,7 +444,7 @@ class _DetailSection extends StatelessWidget {
         _DetailRow(
             cells: _row(S.statsGroupParticipants, stats.participantStats)),
         const SizedBox(height: AppSpacing.sm),
-        _DetailRow(cells: _row(S.statsGroupTeam, stats.teamStats)),
+        _DetailRow(cells: _row(S.statsGroupTeam, stats.teamStats, pays: false)),
         Divider(height: AppSpacing.lg, color: c.line),
         Row(children: [
           Icon(Icons.event_seat_rounded, size: 15, color: c.ink3),
@@ -462,13 +469,19 @@ class _DetailSection extends StatelessWidget {
     );
   }
 
-  static List<String> _row(String label, WorkshopGroupStats g) => [
+  /// [pays] is `false` for the organising team: organisers do not pay, so
+  /// their payment cells read as empty rather than as zero.
+  static List<String> _row(
+    String label,
+    WorkshopGroupStats g, {
+    bool pays = true,
+  }) =>
+      [
         label,
         toArabicIndic('${g.present}'),
         toArabicIndic('${g.absent}'),
-        toArabicIndic('${g.paid}'),
-        toArabicIndic('${g.unpaid}'),
-        toArabicIndic('${g.unspecified}'),
+        pays ? toArabicIndic('${g.paid}') : '—',
+        pays ? toArabicIndic('${g.unpaid}') : '—',
       ];
 }
 

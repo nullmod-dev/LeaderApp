@@ -21,8 +21,9 @@ import 'package:mtm/l10n/strings.dart';
 /// dashboard → detail → export flow and rebuilt on this app's models.
 ///
 /// The contract worth testing is the honesty of the numbers: attendance
-/// counted per group rather than pooled, "not recorded" kept distinct from
-/// "unpaid", money that only ever counts what was actually taken, and one
+/// counted per group rather than pooled, payment read as binary (an old
+/// record with no value is unpaid; organisers are not counted at all), money
+/// that only ever counts what was actually taken, and one
 /// report object behind both export formats so a file can never disagree
 /// with the screen that produced it.
 
@@ -116,7 +117,7 @@ void main() {
       expect(stats.teamStats.percent, 0);
     });
 
-    test('"not recorded" is its own column, never folded into unpaid', () {
+    test('payment is binary: an old record with no value counts as unpaid', () {
       final stats = WorkshopStats.of(_workshop(), [
         _p('1',
             attendance: AttendanceState.checkedIn, payment: PaymentStatus.paid),
@@ -126,19 +127,48 @@ void main() {
         _p('3', attendance: AttendanceState.checkedIn),
       ]);
       expect(stats.participantStats.paid, 1);
-      expect(stats.participantStats.unpaid, 1);
-      expect(stats.participantStats.unspecified, 1);
-      expect(null.label, S.paymentUnspecified);
+      expect(stats.participantStats.unpaid, 2);
+      expect(stats.participantStats.unspecified, 0);
+      expect(null.label, S.paymentUnpaid);
     });
 
-    test('the organising team has no payment record, so it lands unspecified',
-        () {
+    test('organisers are not counted in payment — neither paid nor unpaid', () {
       final stats = WorkshopStats.of(
-        _workshop(team: [_member('t1', AttendanceState.checkedIn)]),
-        const [],
+        _workshop(team: [
+          _member('t1', AttendanceState.checkedIn),
+          _member('t2', AttendanceState.absent),
+        ]),
+        [
+          _p('1',
+              attendance: AttendanceState.checkedIn,
+              payment: PaymentStatus.unpaid),
+        ],
       );
-      expect(stats.teamStats.unspecified, 1);
+      expect(stats.teamStats.total, 2);
       expect(stats.teamStats.paid, 0);
+      expect(stats.teamStats.unpaid, 0);
+      expect(stats.teamStats.unspecified, 0);
+      // The unpaid total is the register's, not inflated by the organisers.
+      expect(stats.unpaidCount, 1);
+    });
+
+    test('a team member line prints its workshop role', () {
+      final stats = WorkshopStats.of(_workshop(), [
+        const WorkshopParticipant(
+          id: 'r1',
+          workshopId: 'w-test',
+          name: 'مدرب',
+          initials: 'مد',
+          kind: ParticipantKind.member,
+          role: WorkshopRole.trainer,
+          attendance: AttendanceState.checkedIn,
+          paymentStatus: PaymentStatus.paid,
+        ),
+        _p('g1',
+            attendance: AttendanceState.checkedIn, kind: ParticipantKind.guest),
+      ]);
+      expect(stats.participants.first.roleLabel, S.workshopRoleTrainer);
+      expect(stats.participants.last.roleLabel, S.participantGuest);
     });
   });
 
@@ -150,7 +180,7 @@ void main() {
         _p('2',
             attendance: AttendanceState.checkedIn, payment: PaymentStatus.paid),
         // Neither of these adds a pound to the total: one has not paid, and
-        // the other simply has not been recorded.
+        // the other is an old record with no value — also unpaid.
         _p('3',
             attendance: AttendanceState.checkedIn,
             payment: PaymentStatus.unpaid),
@@ -158,8 +188,8 @@ void main() {
       ]);
       expect(stats.paidCount, 2);
       expect(stats.totalPaidAmount, 5000);
-      expect(stats.unpaidCount, 1);
-      expect(stats.unspecifiedCount, 1);
+      expect(stats.unpaidCount, 2);
+      expect(stats.unspecifiedCount, 0);
     });
 
     test('a free workshop says so instead of printing zeros', () {
@@ -246,6 +276,8 @@ void main() {
       expect(csv, contains(S.paymentPaid));
       // The guest's role reaches the file, not just the screen.
       expect(csv, contains(S.participantGuest));
+      // The binary payment columns only — no "not recorded" column.
+      expect(csv, isNot(contains(S.paymentUnspecified)));
     });
 
     test('a person row is numbered from one in Arabic-Indic digits', () {
@@ -324,8 +356,8 @@ void main() {
   group('the dashboard renders the whole flow', () {
     testWidgets('dashboard, detail table and both export surfaces',
         (tester) async {
-      // A workshop with participants, a team, a fee, and all three payment
-      // states present.
+      // A workshop with participants, a team, a fee, and both payment states
+      // present, plus an old record with no payment value.
       await mount(
         tester,
         WorkshopStats.of(
@@ -345,10 +377,12 @@ void main() {
       // Dashboard.
       expect(find.text(S.statsAttendanceSection), findsOneWidget);
       expect(find.text(S.statsFinanceSection), findsOneWidget);
-      // Detail — the same six columns the exported summary uses.
+      // Detail — the same five columns the exported summary uses, and no
+      // "not recorded" column: payment is binary.
       expect(find.text(S.statsDetailSection), findsOneWidget);
       expect(find.text(S.statsColPresent), findsOneWidget);
-      expect(find.text(S.paymentUnspecified), findsWidgets);
+      expect(find.text(S.paymentUnspecified), findsNothing);
+      expect(find.text(S.paymentUnpaid), findsWidgets);
       // Both ways out of the app.
       expect(find.text(S.statsCopyTitle), findsOneWidget);
       expect(find.text(S.statsExportTitle), findsOneWidget);
@@ -386,19 +420,28 @@ void main() {
       expect(first.at, fixed.add(const Duration(days: 4, hours: 3)));
     });
 
-    test('every payment state appears somewhere in the seed', () async {
+    test('the seed records paid and unpaid explicitly, and roles on members',
+        () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final all = _ok(await container.read(workshopListProvider.future));
       final states = <String>{};
+      final roles = <WorkshopRole>{};
       for (final w in all) {
         final parts = _ok(
             await container.read(workshopParticipantsProvider(w.id).future));
         for (final p in parts) {
           states.add(p.paymentStatus?.name ?? 'unspecified');
+          if (p.kind == ParticipantKind.member) {
+            expect(p.role, isNotNull, reason: p.id);
+            roles.add(p.role!);
+          } else {
+            expect(p.role, isNull, reason: p.id);
+          }
         }
       }
-      expect(states, containsAll(['paid', 'unpaid', 'unspecified']));
+      expect(states, {'paid', 'unpaid'});
+      expect(roles, containsAll([WorkshopRole.leader, WorkshopRole.trainer]));
     });
 
     test('workshopStatsProvider composes the workshop with its participants',

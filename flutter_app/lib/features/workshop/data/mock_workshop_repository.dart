@@ -198,6 +198,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'أحمد كنعان',
             initials: 'أك',
             kind: ParticipantKind.member,
+            role: WorkshopRole.leader,
             memberId: 'm1',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -207,6 +208,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'نور الحسن',
             initials: 'نح',
             kind: ParticipantKind.member,
+            role: WorkshopRole.trainer,
             memberId: 'm4',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -216,6 +218,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'رنا سعيد',
             initials: 'رس',
             kind: ParticipantKind.member,
+            role: WorkshopRole.member,
             memberId: 'm6',
             attendance: AttendanceState.notCheckedIn,
             paymentStatus: PaymentStatus.paid),
@@ -251,14 +254,17 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'حسام عابد',
             initials: 'حع',
             kind: ParticipantKind.member,
+            role: WorkshopRole.support,
             memberId: 'm13',
-            attendance: AttendanceState.notCheckedIn),
+            attendance: AttendanceState.notCheckedIn,
+            paymentStatus: PaymentStatus.unpaid),
         const WorkshopParticipant(
             id: 'p8',
             workshopId: 'w2',
             name: 'سلمى نجّار',
             initials: 'سن',
             kind: ParticipantKind.member,
+            role: WorkshopRole.member,
             memberId: 'm16',
             attendance: AttendanceState.notCheckedIn,
             paymentStatus: PaymentStatus.paid),
@@ -278,6 +284,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'ليلى ياسين',
             initials: 'لي',
             kind: ParticipantKind.member,
+            role: WorkshopRole.leader,
             memberId: 'm2',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -287,6 +294,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'سامي درويش',
             initials: 'سد',
             kind: ParticipantKind.member,
+            role: WorkshopRole.trainer,
             memberId: 'm3',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -296,6 +304,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'ياسر البكري',
             initials: 'يب',
             kind: ParticipantKind.member,
+            role: WorkshopRole.member,
             memberId: 'm5',
             attendance: AttendanceState.absent,
             paymentStatus: PaymentStatus.unpaid),
@@ -305,6 +314,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'هند شحادة',
             initials: 'هش',
             kind: ParticipantKind.member,
+            role: WorkshopRole.management,
             memberId: 'm10',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -314,6 +324,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'طارق خالد',
             initials: 'طخ',
             kind: ParticipantKind.member,
+            role: WorkshopRole.member,
             memberId: 'm7',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -325,14 +336,17 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'غادة الحموي',
             initials: 'غح',
             kind: ParticipantKind.member,
+            role: WorkshopRole.trainer,
             memberId: 'm19',
-            attendance: AttendanceState.notCheckedIn),
+            attendance: AttendanceState.notCheckedIn,
+            paymentStatus: PaymentStatus.unpaid),
         const WorkshopParticipant(
             id: 'p16',
             workshopId: 'w4',
             name: 'وسيم الديب',
             initials: 'ود',
             kind: ParticipantKind.member,
+            role: WorkshopRole.member,
             memberId: 'm20',
             attendance: AttendanceState.notCheckedIn,
             paymentStatus: PaymentStatus.paid),
@@ -352,6 +366,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'رامي سلوم',
             initials: 'رس',
             kind: ParticipantKind.member,
+            role: WorkshopRole.leader,
             memberId: 'm24',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -361,6 +376,7 @@ class MockWorkshopRepository implements WorkshopRepository {
             name: 'جود الحلاق',
             initials: 'جح',
             kind: ParticipantKind.member,
+            role: WorkshopRole.support,
             memberId: 'm25',
             attendance: AttendanceState.checkedIn,
             paymentStatus: PaymentStatus.paid),
@@ -581,25 +597,103 @@ class MockWorkshopRepository implements WorkshopRepository {
     return Success(added);
   }
 
-  @override
-  Future<Result<WorkshopParticipant>> addGuestParticipant(
+  /// Whether [name] is already taken inside one part of [workshopId]'s
+  /// register. [except] is the line being renamed, which never collides with
+  /// itself.
+  bool _nameTaken(
     String workshopId,
-    String name,
-  ) async {
+    ParticipantKind kind,
+    String name, {
+    String? except,
+  }) {
+    final key = memberNameKey(name);
+    return _registerOf(workshopId).any((p) =>
+        p.kind == kind && p.id != except && memberNameKey(p.name) == key);
+  }
+
+  @override
+  Future<Result<WorkshopParticipant>> addTeamMember(
+    String workshopId, {
+    required String name,
+    required WorkshopRole role,
+    required bool paid,
+  }) async {
     await _latency();
     final (i, problem) = _writable(workshopId);
     if (problem != null) return problem;
     final normalized = normalizeMemberName(name);
     if (normalized.isEmpty) {
-      return const Failure('اكتب اسم الضيف.', code: 'validation');
+      return const Failure('اكتب اسم العضو.', code: 'validation');
     }
-    final register = _registerOf(workshopId);
-    final key = memberNameKey(normalized);
-    if (register.any((p) =>
-        p.kind == ParticipantKind.guest && memberNameKey(p.name) == key)) {
-      return const Failure('يوجد ضيف بهذا الاسم في الورشة.', code: 'duplicate');
+    if (_nameTaken(workshopId, ParticipantKind.member, normalized)) {
+      return const Failure('يوجد عضو بهذا الاسم في الورشة.', code: 'duplicate');
     }
-    if (register.length >= _workshops[i].capacity) {
+    if (_registerOf(workshopId).length >= _workshops[i].capacity) {
+      return const Failure('الورشة ممتلئة.', code: 'workshop_full');
+    }
+    final member = WorkshopParticipant(
+      id: 'p_${workshopId}_${_nextPart++}',
+      workshopId: workshopId,
+      name: normalized,
+      initials: TeamMember.initialsOf(normalized),
+      kind: ParticipantKind.member,
+      role: role,
+      attendance: AttendanceState.notCheckedIn,
+      paymentStatus: paid ? PaymentStatus.paid : PaymentStatus.unpaid,
+    );
+    _parts.add(member);
+    return Success(member);
+  }
+
+  @override
+  Future<Result<WorkshopParticipant>> updateTeamMember(
+    String participantId, {
+    required String name,
+    required WorkshopRole role,
+    required bool paid,
+  }) async {
+    await _latency();
+    final (i, problem) = _writablePart(participantId);
+    if (problem != null) return problem;
+    final current = _parts[i];
+    if (current.kind != ParticipantKind.member) {
+      return const Failure('لم يُعثر على العضو.', code: 'not_found');
+    }
+    final normalized = normalizeMemberName(name);
+    if (normalized.isEmpty) {
+      return const Failure('اكتب اسم العضو.', code: 'validation');
+    }
+    if (_nameTaken(current.workshopId, ParticipantKind.member, normalized,
+        except: current.id)) {
+      return const Failure('يوجد عضو بهذا الاسم في الورشة.', code: 'duplicate');
+    }
+    _parts[i] = current.copyWith(
+      name: normalized,
+      initials: TeamMember.initialsOf(normalized),
+      role: role,
+      paymentStatus: paid ? PaymentStatus.paid : PaymentStatus.unpaid,
+    );
+    return Success(_parts[i]);
+  }
+
+  @override
+  Future<Result<WorkshopParticipant>> addGuestParticipant(
+    String workshopId,
+    String name, {
+    bool paid = false,
+  }) async {
+    await _latency();
+    final (i, problem) = _writable(workshopId);
+    if (problem != null) return problem;
+    final normalized = normalizeMemberName(name);
+    if (normalized.isEmpty) {
+      return const Failure('اكتب اسم الزائر أو المتطوع.', code: 'validation');
+    }
+    if (_nameTaken(workshopId, ParticipantKind.guest, normalized)) {
+      return const Failure('يوجد زائر أو متطوع بهذا الاسم في الورشة.',
+          code: 'duplicate');
+    }
+    if (_registerOf(workshopId).length >= _workshops[i].capacity) {
       return const Failure('الورشة ممتلئة.', code: 'workshop_full');
     }
     final guest = WorkshopParticipant(
@@ -609,6 +703,7 @@ class MockWorkshopRepository implements WorkshopRepository {
       initials: TeamMember.initialsOf(normalized),
       kind: ParticipantKind.guest,
       attendance: AttendanceState.notCheckedIn,
+      paymentStatus: paid ? PaymentStatus.paid : PaymentStatus.unpaid,
     );
     _parts.add(guest);
     return Success(guest);
