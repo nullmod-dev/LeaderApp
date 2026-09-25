@@ -391,7 +391,7 @@ seam in `FRONTEND-BACKEND-INTEGRATION.md`. "Key" = `Idempotency-Key` required.
 | Members | `GET /detachments/{id}/members`, `PATCH /members/{id}/attendance`, `PATCH /members/{id}/role` | A |
 | Shifts | `GET /detachments/{id}/shifts/today`, `GET /shifts/{id}`, `POST /shifts/{id}/assignments`, `PATCH /shifts/{id}/members/{memberId}/attendance`, `POST …/attendance-corrections` (append-only) | A (+ window/corrections P §6) |
 | Inventory | `GET /detachments/{id}/inventory-items`, `GET /inventory-items/{id}`, `GET …/movements`, `POST …/movements` (append-only) | A |
-| Workshops | `GET /workshops`, `GET /{id}`, `POST`, `PUT /{id}`, `GET /{id}/participants`, `PATCH /workshop-participants/{id}/attendance` | A |
+| Workshops | `GET /workshops`, `GET /{id}`, `POST`, `PUT /{id}`, `GET /{id}/participants`, `PATCH /workshop-participants/{id}/attendance`; register rework (2026-09-24): `POST /workshops/{id}/team-members` (name, role, paid), `PUT /workshop-participants/{id}` (name, role, paid — team members only), `POST /workshops/{id}/guests` now takes `paid` | A |
 | Home | `GET /home/summary?detachmentId` | A |
 | Notifications | `GET /notifications?detachmentId`, `PUT /notifications/read` | A |
 | Announcements | `GET /announcements`, `GET /{id}`, `POST`, `POST /{id}/withdraw` (`announcement.publish` per addressed detachment) | F |

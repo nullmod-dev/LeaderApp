@@ -4,10 +4,10 @@ enum WorkshopStatus { scheduled, ongoing, done }
 
 /// Whether a person has paid the workshop's registration fee.
 ///
-/// Deliberately used as a *nullable* type everywhere: `null` is a third,
-/// meaningful state — "not recorded yet" — and it is the state most people
-/// are in before the door opens. Collapsing it into `unpaid` would turn a
-/// missing record into an accusation.
+/// Payment is binary on the register: somebody has paid, or has not. The type
+/// stays nullable on the wire because old records may carry no value; the
+/// register and the statistics read a missing value as unpaid
+/// ([WorkshopParticipant.isPaid]).
 enum PaymentStatus { paid, unpaid }
 
 class Workshop {
@@ -112,18 +112,23 @@ class Workshop {
       };
 }
 
-/// A member is a person on the tenant's roster, linked by
-/// [WorkshopParticipant.memberId]; a guest is somebody from outside the team,
-/// known only by the name typed at the door.
+/// The two parts of a workshop's register.
+///
+/// A member is one of the workshop's own team members: a name typed in by
+/// hand, with a [WorkshopRole]. A guest is a volunteer or a visitor — not a
+/// team member, known only by name. The value keeps its wire name `guest`.
 enum ParticipantKind { member, guest }
+
+/// What a team member does on this workshop. Workshop-only, and separate from
+/// the roster's `TeamRole`: nobody on a workshop is picked from the roster.
+/// Stored on the wire by `.name`.
+enum WorkshopRole { leader, trainer, support, management, member }
 
 /// One line of a workshop's register.
 ///
-/// A member participant is a *reference* to a roster [TeamMember] — the
-/// [memberId] is the relationship, and [name]/[initials] are a display
-/// snapshot taken when they were added. Removing the line never touches the
-/// roster, and deleting the roster member later leaves the register readable
-/// under the name it was recorded with.
+/// Every workshop owns its own people: a line is never shared with another
+/// workshop, and removing it touches nothing else. [memberId] survives only
+/// on old records that were once linked to a roster member.
 class WorkshopParticipant {
   const WorkshopParticipant({
     required this.id,
@@ -134,6 +139,7 @@ class WorkshopParticipant {
     required this.attendance,
     this.memberId,
     this.paymentStatus,
+    this.role,
   });
 
   final String id;
@@ -143,17 +149,27 @@ class WorkshopParticipant {
   final ParticipantKind kind;
   final AttendanceState attendance;
 
-  /// The roster member this line refers to. Always set for
-  /// [ParticipantKind.member] written by this client; `null` for a guest, and
-  /// tolerated as `null` on an old member record that predates the link.
+  /// Kept only for old records that were linked to a roster member. New
+  /// lines never set it — a team member is a typed name with a [role].
   final String? memberId;
 
-  /// `null` until somebody records it — see [PaymentStatus].
+  /// `null` only on old records. The register and the statistics read
+  /// [isPaid], so a missing record shows and counts as unpaid; new lines are
+  /// always written as paid or unpaid.
   final PaymentStatus? paymentStatus;
+
+  /// Set for [ParticipantKind.member], `null` for a guest.
+  final WorkshopRole? role;
+
+  /// The one payment reading the UI uses: anything but `paid` is unpaid.
+  bool get isPaid => paymentStatus == PaymentStatus.paid;
 
   /// [clearPayment] returns the record to "not recorded" — the one value a
   /// plain nullable argument cannot express.
   WorkshopParticipant copyWith({
+    String? name,
+    String? initials,
+    WorkshopRole? role,
     AttendanceState? attendance,
     PaymentStatus? paymentStatus,
     bool clearPayment = false,
@@ -161,32 +177,43 @@ class WorkshopParticipant {
       WorkshopParticipant(
         id: id,
         workshopId: workshopId,
-        name: name,
-        initials: initials,
+        name: name ?? this.name,
+        initials: initials ?? this.initials,
         kind: kind,
         memberId: memberId,
+        role: role ?? this.role,
         attendance: attendance ?? this.attendance,
         paymentStatus:
             clearPayment ? null : paymentStatus ?? this.paymentStatus,
       );
 
-  factory WorkshopParticipant.fromJson(Map<String, dynamic> j) =>
-      WorkshopParticipant(
-        id: j['id'] as String,
-        workshopId: j['workshopId'] as String,
-        name: j['name'] as String,
-        initials: j['initials'] as String,
-        kind: ParticipantKind.values.firstWhere((k) => k.name == j['kind']),
-        memberId: j['memberId'] as String?,
-        attendance: attendanceStateFromWire(
-          (j['attendance'] as String?) ?? 'notCheckedIn',
-        ),
-        paymentStatus: switch (j['paymentStatus'] as String?) {
-          'paid' => PaymentStatus.paid,
-          'unpaid' => PaymentStatus.unpaid,
-          _ => null,
-        },
-      );
+  factory WorkshopParticipant.fromJson(Map<String, dynamic> j) {
+    final kind = ParticipantKind.values.firstWhere((k) => k.name == j['kind']);
+    return WorkshopParticipant(
+      id: j['id'] as String,
+      workshopId: j['workshopId'] as String,
+      name: j['name'] as String,
+      initials: j['initials'] as String,
+      kind: kind,
+      memberId: j['memberId'] as String?,
+      // An old member line has no role; an unknown one is read as a plain
+      // member rather than refused.
+      role: kind == ParticipantKind.guest
+          ? null
+          : WorkshopRole.values.firstWhere(
+              (r) => r.name == j['role'],
+              orElse: () => WorkshopRole.member,
+            ),
+      attendance: attendanceStateFromWire(
+        (j['attendance'] as String?) ?? 'notCheckedIn',
+      ),
+      paymentStatus: switch (j['paymentStatus'] as String?) {
+        'paid' => PaymentStatus.paid,
+        'unpaid' => PaymentStatus.unpaid,
+        _ => null,
+      },
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -195,6 +222,7 @@ class WorkshopParticipant {
         'initials': initials,
         'kind': kind.name,
         if (memberId != null) 'memberId': memberId,
+        if (role != null) 'role': role!.name,
         'attendance': attendance.name,
         if (paymentStatus != null) 'paymentStatus': paymentStatus!.name,
       };

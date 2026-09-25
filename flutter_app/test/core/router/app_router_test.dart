@@ -57,6 +57,8 @@ const _locations = <String>[
   '/workshop/w1/edit',
   '/workshop/w1/team',
   '/workshop/w1/members',
+  '/workshop/w1/members/new',
+  '/workshop/w1/members/p1/edit',
   '/workshop/w1/stats',
   '/more',
   '/more/themes',
@@ -81,6 +83,15 @@ const _legacyLocations = <String>[
   '/tenant/t1/edit',
   '/tenant/t1/detachment/new',
 ];
+
+/// Every plain [ShellRoute] (a detail tab shell) in a match tree.
+List<ShellRouteMatch> _plainShells(List<RouteMatchBase> matches) => [
+      for (final m in matches)
+        if (m is ShellRouteMatch) ...[
+          if (m.route is ShellRoute) m,
+          ..._plainShells(m.matches),
+        ],
+    ];
 
 GoRouter _buildRouter() {
   final container = ProviderContainer();
@@ -108,6 +119,25 @@ void main() {
       final match = router.configuration.findMatch(Uri.parse(location));
       expect(match.isError, isFalse, reason: '$location did not match');
     }
+  });
+
+  test('the member form is a full page over the workshop, not a tab', () {
+    final router = _buildRouter();
+    for (final location in const [
+      '/workshop/w1/members/new',
+      '/workshop/w1/members/p1/edit',
+    ]) {
+      final match = router.configuration.findMatch(Uri.parse(location));
+      expect(match.isError, isFalse, reason: '$location did not match');
+      // A sibling of the detail ShellRoute: the only shell around it is the
+      // app's bottom-nav StatefulShellRoute, never the workshop tab shell.
+      expect(_plainShells(match.matches), isEmpty,
+          reason: '$location rendered inside the tab shell');
+    }
+    // The tab itself does sit inside the detail shell.
+    final tab =
+        router.configuration.findMatch(Uri.parse('/workshop/w1/members'));
+    expect(_plainShells(tab.matches), isNotEmpty);
   });
 
   test('an unknown location does not match', () {

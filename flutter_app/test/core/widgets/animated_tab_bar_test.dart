@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtm/core/theme/app_palette.dart';
 import 'package:mtm/core/theme/app_theme.dart';
+import 'package:mtm/core/theme/app_typography.dart';
 import 'package:mtm/core/widgets/animated_tab_bar.dart';
 import 'package:mtm/core/widgets/swipe_tabs.dart';
 import 'package:mtm/l10n/strings.dart';
@@ -66,6 +69,20 @@ class _HarnessState extends State<_Harness> {
 }
 
 void main() {
+  // The strip's widths come from measured text, so measure the app's real
+  // Arabic face. The default test font draws every glyph a full em wide,
+  // which makes «المتطوعون والزوار» wider than a 320dp screen when the
+  // shipped font renders it at 192dp (1.6x).
+  setUpAll(() async {
+    final loader = FontLoader(AppTypography.family);
+    for (final weight in ['Regular', 'Medium', 'SemiBold']) {
+      loader.addFont(Future.value(ByteData.sublistView(
+          File('assets/fonts/IBMPlexSansArabic-$weight.ttf')
+              .readAsBytesSync())));
+    }
+    await loader.load();
+  });
+
   Future<void> pump(WidgetTester tester, {int index = 2}) async {
     tester.view.physicalSize = const Size(320, 760);
     tester.view.devicePixelRatio = 1;

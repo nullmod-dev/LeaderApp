@@ -251,6 +251,197 @@ void main() {
     });
   });
 
+  group('team members typed by name', () {
+    test('a team member is saved with a name, a role and paid', () async {
+      final before = await register(workshop);
+      final m = ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: '  سارة   المدربة ', role: WorkshopRole.trainer, paid: true));
+      expect(m.kind, ParticipantKind.member);
+      expect(m.name, 'سارة المدربة');
+      expect(m.role, WorkshopRole.trainer);
+      expect(m.memberId, isNull);
+      expect(m.paymentStatus, PaymentStatus.paid);
+      expect(m.isPaid, isTrue);
+      expect(m.attendance, AttendanceState.notCheckedIn);
+      expect((await register(workshop)).length, before.length + 1);
+
+      final unpaid = ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: 'عضو آخر', role: WorkshopRole.member, paid: false));
+      // Written explicitly as unpaid, never left as "not recorded".
+      expect(unpaid.paymentStatus, PaymentStatus.unpaid);
+    });
+
+    test('an empty name is refused', () async {
+      expect(
+        failureCode(await repo.addTeamMember(workshop,
+            name: '   ', role: WorkshopRole.member, paid: false)),
+        'validation',
+      );
+    });
+
+    test('duplicates are refused within a part, not across parts', () async {
+      ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: 'اسم مشترك', role: WorkshopRole.leader, paid: false));
+      expect(
+        failureCode(await repo.addTeamMember(workshop,
+            name: 'اسم  مشترك', role: WorkshopRole.support, paid: true)),
+        'duplicate',
+      );
+      // The same name among the visitors is a different person.
+      ok<WorkshopParticipant>(
+          await repo.addGuestParticipant(workshop, 'اسم مشترك'));
+      expect(
+        failureCode(await repo.addGuestParticipant(workshop, 'اسم مشترك')),
+        'duplicate',
+      );
+    });
+
+    test('a full workshop refuses another team member', () async {
+      expect(
+        failureCode(await repo.addTeamMember(full,
+            name: 'عضو جديد', role: WorkshopRole.member, paid: false)),
+        'workshop_full',
+      );
+    });
+
+    test('an archived workshop refuses team member changes', () async {
+      final line = ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: 'قبل الأرشفة', role: WorkshopRole.member, paid: false));
+      ok<Workshop>(await repo.setArchived(workshop, archived: true));
+      expect(
+        failureCode(await repo.addTeamMember(workshop,
+            name: 'بعد الأرشفة', role: WorkshopRole.member, paid: false)),
+        'archived',
+      );
+      expect(
+        failureCode(await repo.updateTeamMember(line.id,
+            name: 'تعديل', role: WorkshopRole.leader, paid: true)),
+        'archived',
+      );
+    });
+
+    test('an edit saves name, role and payment and may keep its own name',
+        () async {
+      final line = ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: 'أحمد سالم', role: WorkshopRole.member, paid: false));
+      // Saving the same name again never collides with itself.
+      final same = ok<WorkshopParticipant>(await repo.updateTeamMember(line.id,
+          name: 'أحمد سالم', role: WorkshopRole.management, paid: true));
+      expect(same.role, WorkshopRole.management);
+      expect(same.isPaid, isTrue);
+
+      final renamed = ok<WorkshopParticipant>(await repo.updateTeamMember(
+          line.id,
+          name: 'احمد سالم',
+          role: WorkshopRole.leader,
+          paid: false));
+      expect(renamed.name, 'احمد سالم');
+      expect(renamed.initials, TeamMember.initialsOf('احمد سالم'));
+      expect(renamed.paymentStatus, PaymentStatus.unpaid);
+      expect(renamed.attendance, line.attendance);
+
+      // Renaming onto another team member's name is refused.
+      ok<WorkshopParticipant>(await repo.addTeamMember(workshop,
+          name: 'اسم محجوز', role: WorkshopRole.member, paid: false));
+      expect(
+        failureCode(await repo.updateTeamMember(line.id,
+            name: 'اسم محجوز', role: WorkshopRole.member, paid: false)),
+        'duplicate',
+      );
+      expect(
+        failureCode(await repo.updateTeamMember(line.id,
+            name: ' ', role: WorkshopRole.member, paid: false)),
+        'validation',
+      );
+    });
+
+    test('a visitor id is not a team member to edit', () async {
+      final guest = ok<WorkshopParticipant>(
+          await repo.addGuestParticipant(workshop, 'زائر فقط'));
+      expect(
+        failureCode(await repo.updateTeamMember(guest.id,
+            name: 'x', role: WorkshopRole.member, paid: false)),
+        'not_found',
+      );
+      expect(
+        failureCode(await repo.updateTeamMember('p_missing',
+            name: 'x', role: WorkshopRole.member, paid: false)),
+        'not_found',
+      );
+    });
+
+    test('a visitor is saved with paid or unpaid, and no role', () async {
+      final paid = ok<WorkshopParticipant>(
+          await repo.addGuestParticipant(workshop, 'متطوع دافع', paid: true));
+      expect(paid.paymentStatus, PaymentStatus.paid);
+      expect(paid.role, isNull);
+      final unpaid = ok<WorkshopParticipant>(
+          await repo.addGuestParticipant(workshop, 'زائر غير دافع'));
+      expect(unpaid.paymentStatus, PaymentStatus.unpaid);
+    });
+  });
+
+  group('the register line on the wire', () {
+    test('a role round-trips by name', () {
+      const line = WorkshopParticipant(
+        id: 'x1',
+        workshopId: 'w1',
+        name: 'قائد',
+        initials: 'قا',
+        kind: ParticipantKind.member,
+        role: WorkshopRole.leader,
+        attendance: AttendanceState.checkedIn,
+        paymentStatus: PaymentStatus.paid,
+      );
+      final json = line.toJson();
+      expect(json['role'], 'leader');
+      final back = WorkshopParticipant.fromJson(json);
+      expect(back.role, WorkshopRole.leader);
+      expect(back.paymentStatus, PaymentStatus.paid);
+      expect(back.kind, ParticipantKind.member);
+    });
+
+    test('an old member record with no role reads as a plain member', () {
+      final old = WorkshopParticipant.fromJson(const {
+        'id': 'old1',
+        'workshopId': 'w1',
+        'name': 'قديم',
+        'initials': 'قد',
+        'kind': 'member',
+        'memberId': 'm1',
+        'attendance': 'checkedIn',
+      });
+      expect(old.role, WorkshopRole.member);
+      expect(old.memberId, 'm1');
+      expect(old.paymentStatus, isNull);
+      expect(old.isPaid, isFalse);
+
+      final unknown = WorkshopParticipant.fromJson(const {
+        'id': 'old2',
+        'workshopId': 'w1',
+        'name': 'مجهول',
+        'initials': 'مج',
+        'kind': 'member',
+        'role': 'captain',
+      });
+      expect(unknown.role, WorkshopRole.member);
+    });
+
+    test('a guest never carries a role, and writes none', () {
+      final guest = WorkshopParticipant.fromJson(const {
+        'id': 'g1',
+        'workshopId': 'w1',
+        'name': 'زائر',
+        'initials': 'زا',
+        'kind': 'guest',
+        'role': 'leader',
+        'paymentStatus': 'unpaid',
+      });
+      expect(guest.role, isNull);
+      expect(guest.toJson().containsKey('role'), isFalse);
+    });
+  });
+
   group('statistics', () {
     test('read the register as it is now, not a stored figure', () async {
       final before = WorkshopStats.of(

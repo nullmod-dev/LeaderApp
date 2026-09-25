@@ -17,11 +17,18 @@ extension WorkshopStatsGroupLabel on WorkshopStatsGroup {
 }
 
 extension PaymentStatusLabel on PaymentStatus? {
-  /// `null` reads as "not recorded", never as "unpaid".
+  /// Binary: an old record with no value reads as unpaid.
+  String get label =>
+      this == PaymentStatus.paid ? S.paymentPaid : S.paymentUnpaid;
+}
+
+extension WorkshopRoleLabel on WorkshopRole {
   String get label => switch (this) {
-        PaymentStatus.paid => S.paymentPaid,
-        PaymentStatus.unpaid => S.paymentUnpaid,
-        null => S.paymentUnspecified,
+        WorkshopRole.leader => S.workshopRoleLeader,
+        WorkshopRole.trainer => S.workshopRoleTrainer,
+        WorkshopRole.support => S.workshopRoleSupport,
+        WorkshopRole.management => S.workshopRoleManagement,
+        WorkshopRole.member => S.workshopRoleMember,
       };
 }
 
@@ -65,10 +72,18 @@ class WorkshopStatsPerson {
 
   final AttendanceState attendance;
   final PaymentStatus? paymentStatus;
+
+  /// Organisers run the workshop and never pay for it, so they carry no
+  /// payment at all — neither paid nor unpaid.
+  bool get countsPayment => group == WorkshopStatsGroup.participant;
 }
 
 /// One group's counts. Everything here is a count of people, so a reader can
 /// add the columns up and get the total back.
+///
+/// Payment is binary: [unpaid] is everybody who has not paid, an old record
+/// with no value included. [unspecified] survives for wire compatibility and
+/// is always 0.
 class WorkshopGroupStats {
   const WorkshopGroupStats({
     required this.total,
@@ -89,15 +104,23 @@ class WorkshopGroupStats {
   int get percent =>
       total == 0 ? 0 : ((present / total) * 100).round().clamp(0, 100);
 
-  factory WorkshopGroupStats.of(List<WorkshopStatsPerson> people) =>
-      WorkshopGroupStats(
-        total: people.length,
-        present: people.where((p) => p.attendance.wasPresent).length,
-        paid: people.where((p) => p.paymentStatus == PaymentStatus.paid).length,
-        unpaid:
-            people.where((p) => p.paymentStatus == PaymentStatus.unpaid).length,
-        unspecified: people.where((p) => p.paymentStatus == null).length,
-      );
+  /// [countsPayment] is `false` for the organising team: they are left out
+  /// of the payment counts rather than counted as unpaid.
+  factory WorkshopGroupStats.of(
+    List<WorkshopStatsPerson> people, {
+    bool countsPayment = true,
+  }) {
+    final paid = countsPayment
+        ? people.where((p) => p.paymentStatus == PaymentStatus.paid).length
+        : 0;
+    return WorkshopGroupStats(
+      total: people.length,
+      present: people.where((p) => p.attendance.wasPresent).length,
+      paid: paid,
+      unpaid: countsPayment ? people.length - paid : 0,
+      unspecified: 0,
+    );
+  }
 }
 
 /// Everything the workshop statistics screen and its exports read.
@@ -136,9 +159,7 @@ class WorkshopStats {
       participantStats.unspecified + teamStats.unspecified;
 
   /// What has actually come in: the fee times the number of people recorded
-  /// as having paid. Never an expectation — an unrecorded person is not a
-  /// debt, and counting them would make the figure a forecast wearing a
-  /// receipt's clothes.
+  /// as having paid. Never an expectation.
   double get totalPaidAmount => registrationFee * paidCount;
 
   bool get isFree => registrationFee == 0;
@@ -155,14 +176,15 @@ class WorkshopStats {
   List<WorkshopStatsPerson> get teamMembers =>
       people.where((p) => p.group == WorkshopStatsGroup.team).toList();
 
-  List<WorkshopStatsPerson> get paidPeople =>
-      people.where((p) => p.paymentStatus == PaymentStatus.paid).toList();
+  List<WorkshopStatsPerson> get paidPeople => people
+      .where((p) => p.countsPayment && p.paymentStatus == PaymentStatus.paid)
+      .toList();
 
   /// Flattens a workshop and its participants into the statistics.
   ///
   /// The organising team comes off the workshop record itself — it is a list
   /// of roster members, not of registrations, so nobody on it carries a
-  /// payment record. They land in "not recorded", which is the truth: the
+  /// payment record. They are left out of the payment counts entirely: the
   /// team runs the workshop, it does not buy a seat at it.
   factory WorkshopStats.of(
     Workshop workshop,
@@ -176,7 +198,7 @@ class WorkshopStats {
           group: WorkshopStatsGroup.participant,
           roleLabel: p.kind == ParticipantKind.guest
               ? S.participantGuest
-              : S.participantMember,
+              : (p.role ?? WorkshopRole.member).label,
           attendance: p.attendance,
           paymentStatus: p.paymentStatus,
         ),
@@ -204,6 +226,7 @@ class WorkshopStats {
       ),
       teamStats: WorkshopGroupStats.of(
         people.where((p) => p.group == WorkshopStatsGroup.team).toList(),
+        countsPayment: false,
       ),
       people: people,
     );

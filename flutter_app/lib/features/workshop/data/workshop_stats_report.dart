@@ -56,11 +56,10 @@ ReportDocument buildWorkshopStatsReport(
           S.statsColAbsent,
           S.paymentPaid,
           S.paymentUnpaid,
-          S.paymentUnspecified,
         ],
         [
           _summaryRow(S.statsGroupParticipants, stats.participantStats),
-          _summaryRow(S.statsGroupTeam, stats.teamStats),
+          _summaryRow(S.statsGroupTeam, stats.teamStats, pays: false),
         ],
       ),
       ReportFacts(S.statsFinanceSection, [
@@ -112,13 +111,19 @@ ReportDocument buildWorkshopStatsReport(
   );
 }
 
-List<String> _summaryRow(String label, WorkshopGroupStats group) => [
+/// [pays] is `false` for the organising team, whose payment cells stay
+/// empty rather than reading as zero.
+List<String> _summaryRow(
+  String label,
+  WorkshopGroupStats group, {
+  bool pays = true,
+}) =>
+    [
       label,
       AppNumber.count(group.present),
       AppNumber.count(group.absent),
-      AppNumber.count(group.paid),
-      AppNumber.count(group.unpaid),
-      AppNumber.count(group.unspecified),
+      pays ? AppNumber.count(group.paid) : '—',
+      pays ? AppNumber.count(group.unpaid) : '—',
     ];
 
 List<List<String>> _peopleRows(List<WorkshopStatsPerson> people) => [
@@ -128,7 +133,8 @@ List<List<String>> _peopleRows(List<WorkshopStatsPerson> people) => [
           people[i].name,
           people[i].roleLabel,
           people[i].attendance.statsLabel,
-          people[i].paymentStatus.label,
+          // Organisers do not pay; their payment cell stays empty.
+          people[i].countsPayment ? people[i].paymentStatus.label : '—',
         ],
     ];
 

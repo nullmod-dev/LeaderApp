@@ -85,6 +85,7 @@ import '../../features/workshop/presentation/tabs/workshop_stats_tab.dart';
 import '../../features/workshop/presentation/tabs/workshop_team_tab.dart';
 import '../../features/workshop/presentation/workshop_detail_shell.dart';
 import '../../features/workshop/presentation/workshop_edit_page.dart';
+import '../../features/workshop/presentation/workshop_member_form_page.dart';
 import '../../features/workshop/presentation/workshop_list_page.dart';
 import '../../features/tenant_feature/data/tenant_feature_providers.dart';
 import '../../features/tenant_feature/domain/tenant_feature_models.dart';
@@ -595,6 +596,46 @@ StatefulShellBranch _workshopBranch(Ref ref) => StatefulShellBranch(
               pageBuilder: (context, state) => _sharedAxisPage(
                 key: state.pageKey,
                 child: WorkshopEditPage(id: state.pathParameters['id']),
+              ),
+            ),
+            // Full pages over the detail shell, like ':id/edit' — registered
+            // before the ShellRoute so they never render inside the tabs.
+            GoRoute(
+              path: ':id/members/new',
+              parentNavigatorKey: _rootKey,
+              redirect: _needs(ref, const {Cap.workshopPeopleManage},
+                  fallback: '/workshop'),
+              pageBuilder: (context, state) => _sharedAxisPage(
+                key: state.pageKey,
+                child: WorkshopMemberFormPage(
+                  workshopId: state.pathParameters['id']!,
+                ),
+              ),
+            ),
+            GoRoute(
+              path: ':id/volunteers/new',
+              parentNavigatorKey: _rootKey,
+              redirect: _needs(ref, const {Cap.workshopPeopleManage},
+                  fallback: '/workshop'),
+              pageBuilder: (context, state) => _sharedAxisPage(
+                key: state.pageKey,
+                child: WorkshopMemberFormPage(
+                  workshopId: state.pathParameters['id']!,
+                  volunteer: true,
+                ),
+              ),
+            ),
+            GoRoute(
+              path: ':id/members/:pid/edit',
+              parentNavigatorKey: _rootKey,
+              redirect: _needs(ref, const {Cap.workshopPeopleManage},
+                  fallback: '/workshop'),
+              pageBuilder: (context, state) => _sharedAxisPage(
+                key: state.pageKey,
+                child: WorkshopMemberFormPage(
+                  workshopId: state.pathParameters['id']!,
+                  participantId: state.pathParameters['pid'],
+                ),
               ),
             ),
             ShellRoute(

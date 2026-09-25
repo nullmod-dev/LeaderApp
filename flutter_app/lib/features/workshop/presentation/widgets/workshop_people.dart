@@ -1,28 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/motion/animated_counter.dart';
 import '../../../../core/motion/press_scale.dart';
 import '../../../../core/result/result.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/async_result.dart';
-import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/section_header.dart';
-import '../../../../core/widgets/sheet_scaffold.dart';
 import '../../../../core/widgets/status_chip.dart';
 import '../../../../l10n/strings.dart';
-import '../../../team/domain/member_search.dart';
 import '../../../team/domain/team_models.dart';
-import '../../data/workshop_providers.dart';
 import '../../domain/workshop_models.dart';
 
 /// The people-management pieces the two workshop people tabs share: the
-/// roster picker, the guest-name sheet, the removal confirmation and the
-/// attendance / payment choices.
+/// person row, the paid switch, the removal confirmation and the attendance /
+/// payment choices.
 ///
-/// Every person offered here comes off the tenant's roster by id — the picker
-/// never mints a person, it only points at one.
+/// Nobody is picked from the roster: team members and volunteers are typed
+/// by name on their own page and belong to one workshop.
 
 /// Shows the outcome of a workshop command. `true` when it succeeded.
 bool reportWorkshopResult(
@@ -47,239 +40,6 @@ bool reportWorkshopResult(
       return false;
     },
   );
-}
-
-/// Opens the roster picker and answers with the chosen member ids, or `null`
-/// when the sheet is dismissed.
-///
-/// [registeredIds] and [organizerIds] are shown but cannot be picked — the
-/// same person is never put on one workshop twice. [seatsLeft] caps how many
-/// can be picked at once; `null` means no seat limit applies.
-Future<List<String>?> pickWorkshopMembers(
-  BuildContext context, {
-  required String title,
-  required Set<String> registeredIds,
-  required Set<String> organizerIds,
-  int? seatsLeft,
-}) {
-  return showAppSheet<List<String>>(
-    context: context,
-    title: title,
-    expanded: true,
-    child: WorkshopMemberPicker(
-      registeredIds: registeredIds,
-      organizerIds: organizerIds,
-      seatsLeft: seatsLeft,
-    ),
-  );
-}
-
-class WorkshopMemberPicker extends ConsumerStatefulWidget {
-  const WorkshopMemberPicker({
-    super.key,
-    required this.registeredIds,
-    required this.organizerIds,
-    this.seatsLeft,
-  });
-
-  final Set<String> registeredIds;
-  final Set<String> organizerIds;
-  final int? seatsLeft;
-
-  @override
-  ConsumerState<WorkshopMemberPicker> createState() =>
-      _WorkshopMemberPickerState();
-}
-
-class _WorkshopMemberPickerState extends ConsumerState<WorkshopMemberPicker> {
-  final _search = TextEditingController();
-  final Set<String> _picked = {};
-  String _query = '';
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  bool _taken(String id) =>
-      widget.registeredIds.contains(id) || widget.organizerIds.contains(id);
-
-  bool get _atLimit =>
-      widget.seatsLeft != null && _picked.length >= widget.seatsLeft!;
-
-  List<WorkshopCandidate> _apply(List<WorkshopCandidate> all) {
-    final needle = memberSearchKey(_query);
-    final matches = [
-      for (final c in all)
-        if (needle.isEmpty ||
-            memberSearchKey(c.member.name).contains(needle) ||
-            memberSearchKey(c.member.department).contains(needle) ||
-            memberSearchKey(c.detachment).contains(needle))
-          c,
-    ];
-    // Who can still be added first; roster order otherwise.
-    return [
-      ...matches.where((c) => !_taken(c.member.id)),
-      ...matches.where((c) => _taken(c.member.id)),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return AsyncResultView<List<WorkshopCandidate>>(
-      value: ref.watch(workshopCandidatesProvider),
-      onRetry: () => ref.invalidate(workshopCandidatesProvider),
-      builder: (context, all, stale) {
-        if (all.isEmpty) {
-          return const EmptyState(
-            icon: Icons.groups_outlined,
-            title: S.workshopPickNone,
-            body: S.workshopPickNoneSub,
-          );
-        }
-        final shown = _apply(all);
-        final noSeats = widget.seatsLeft != null && widget.seatsLeft! <= 0;
-        return Column(children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
-            child: TextField(
-              controller: _search,
-              onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: S.workshopPickSearch,
-              ),
-            ),
-          ),
-          if (noSeats || _atLimit)
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.sm),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  S.workshopPickNoSeats,
-                  style: TextStyle(color: c.warn, fontSize: 13),
-                ),
-              ),
-            ),
-          Expanded(
-            child: shown.isEmpty
-                ? const EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: S.workshopPickNoMatch,
-                    body: '',
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-                    itemCount: shown.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, i) => _candidateRow(shown[i]),
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _picked.isEmpty
-                    ? null
-                    : () => Navigator.of(context).pop(_picked.toList()),
-                child: Text(
-                  _picked.isEmpty
-                      ? S.workshopPickEmptySelection
-                      : '${S.workshopPickConfirm} '
-                          '(${toArabicIndic('${_picked.length}')})',
-                ),
-              ),
-            ),
-          ),
-        ]);
-      },
-    );
-  }
-
-  Widget _candidateRow(WorkshopCandidate candidate) {
-    final c = context.c;
-    final m = candidate.member;
-    final taken = _taken(m.id);
-    final picked = _picked.contains(m.id);
-    final enabled = !taken && (picked || !_atLimit);
-    final subtitle = [
-      candidate.detachment,
-      if (m.department.trim().isNotEmpty) m.department.trim(),
-    ].join(' · ');
-    void toggle() => setState(() {
-          if (!_picked.remove(m.id)) _picked.add(m.id);
-        });
-
-    return Semantics(
-      button: !taken,
-      selected: picked,
-      enabled: enabled,
-      child: PressScale(
-        onTap: enabled ? toggle : null,
-        enabled: enabled,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.md, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: picked ? c.primaryTint : c.surface,
-            border: Border.all(color: picked ? c.primary : c.line),
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-          ),
-          child: Row(children: [
-            WorkshopAvatar(initials: m.initials, guest: false),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    m.name,
-                    style: TextStyle(
-                      color: taken ? c.ink3 : c.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: c.ink3, fontSize: 12),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            if (taken)
-              StatusChip(
-                kind: StatusKind.muted,
-                label: widget.organizerIds.contains(m.id)
-                    ? S.workshopPickAlreadyOrganizer
-                    : S.workshopPickAlreadyParticipant,
-              )
-            else
-              ExcludeSemantics(
-                child: Checkbox(
-                  value: picked,
-                  onChanged: enabled ? (_) => toggle() : null,
-                ),
-              ),
-          ]),
-        ),
-      ),
-    );
-  }
 }
 
 /// The monogram every workshop person row starts with.
@@ -398,63 +158,60 @@ class WorkshopPersonRow extends StatelessWidget {
   }
 }
 
-/// Asks for a guest's name. `null` when dismissed.
-Future<String?> askWorkshopGuestName(BuildContext context) {
-  return showAppSheet<String>(
-    context: context,
-    title: S.workshopAddGuest,
-    child: const _GuestNameForm(),
-  );
-}
+/// The "paid the workshop fee" switch on the team-member and volunteer
+/// pages. Off means unpaid. [feeLabel] is the fee as
+/// text, printed under the title.
+class WorkshopPaidSwitch extends StatelessWidget {
+  const WorkshopPaidSwitch({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.feeLabel,
+  });
 
-class _GuestNameForm extends StatefulWidget {
-  const _GuestNameForm();
-
-  @override
-  State<_GuestNameForm> createState() => _GuestNameFormState();
-}
-
-class _GuestNameFormState extends State<_GuestNameForm> {
-  final _name = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(context).pop(normalizeMemberName(_name.text));
-  }
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final String? feeLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _submit(),
-            decoration: const InputDecoration(
-              labelText: S.workshopGuestName,
-              hintText: S.workshopGuestNameHint,
+    final c = context.c;
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: value ? c.ok : c.line),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: SwitchListTile.adaptive(
+        key: const Key('workshop-paid-switch'),
+        value: value,
+        onChanged: onChanged,
+        contentPadding:
+            const EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.md),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
+        title: Text(
+          S.workshopPaidSwitch,
+          style: TextStyle(
+            color: c.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            StatusChip(
+              kind: value ? StatusKind.ok : StatusKind.crit,
+              label: value ? S.paymentPaid : S.paymentUnpaid,
             ),
-            validator: (v) =>
-                normalizeMemberName(v ?? '').isEmpty ? S.required : null,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: _submit,
-            child: const Text(S.workshopAddGuest),
-          ),
-        ],
+            if (feeLabel != null)
+              Text(feeLabel!, style: TextStyle(color: c.ink3, fontSize: 12)),
+          ],
+        ),
       ),
     );
   }
@@ -489,23 +246,58 @@ Future<bool> confirmWorkshopRemoval(
   return ok == true;
 }
 
+/// One attendance choice a person sheet offers: the state it records, its
+/// label and its icon.
+typedef WorkshopAttendanceChoice = (AttendanceState, String, IconData);
+
+/// The attendance choices each workshop list offers.
+abstract final class WorkshopAttendanceChoices {
+  /// The organising team: the full set.
+  static const List<WorkshopAttendanceChoice> all = [
+    (AttendanceState.checkedIn, S.checkedIn, Icons.check_circle_rounded),
+    (AttendanceState.checkedOut, S.checkedOut, Icons.logout_rounded),
+    (AttendanceState.absent, S.absent, Icons.cancel_rounded),
+    (AttendanceState.notCheckedIn, S.notCheckedIn, Icons.remove_circle_outline),
+  ];
+
+  /// The register — team members and volunteers/visitors: came, or is not
+  /// coming. Same states, workshop-only wording.
+  static const List<WorkshopAttendanceChoice> register = [
+    (AttendanceState.checkedIn, S.checkedIn, Icons.check_circle_rounded),
+    (AttendanceState.absent, S.workshopNotComing, Icons.cancel_rounded),
+  ];
+}
+
 /// What one person's sheet offers. A `null` handler hides that section, so
 /// the sheet only ever shows what this session may actually do.
+///
+/// The defaults are the organising team's sheet; the register passes its own
+/// [attendanceChoices], [binaryPayment] and [onEdit].
 class WorkshopPersonActions extends StatelessWidget {
   const WorkshopPersonActions({
     super.key,
     required this.attendance,
     this.onAttendance,
+    this.attendanceChoices = WorkshopAttendanceChoices.all,
     this.payment,
     this.onPayment,
+    this.binaryPayment = false,
+    this.onEdit,
+    this.editLabel,
     this.onRemove,
     required this.removeLabel,
   });
 
   final AttendanceState attendance;
   final ValueChanged<AttendanceState>? onAttendance;
+  final List<WorkshopAttendanceChoice> attendanceChoices;
   final PaymentStatus? payment;
   final void Function(PaymentStatus?)? onPayment;
+
+  /// Only paid / unpaid, with a missing record shown as unpaid.
+  final bool binaryPayment;
+  final VoidCallback? onEdit;
+  final String? editLabel;
   final VoidCallback? onRemove;
   final String removeLabel;
 
@@ -519,20 +311,7 @@ class WorkshopPersonActions extends StatelessWidget {
         if (onAttendance != null) ...[
           const SectionHeader(
               padding: _sheetHeaderPadding, title: S.workshopAttendanceSection),
-          for (final (state, label, icon) in const [
-            (
-              AttendanceState.checkedIn,
-              S.checkedIn,
-              Icons.check_circle_rounded
-            ),
-            (AttendanceState.checkedOut, S.checkedOut, Icons.logout_rounded),
-            (AttendanceState.absent, S.absent, Icons.cancel_rounded),
-            (
-              AttendanceState.notCheckedIn,
-              S.notCheckedIn,
-              Icons.remove_circle_outline
-            ),
-          ])
+          for (final (state, label, icon) in attendanceChoices)
             _ChoiceRow(
               label: label,
               icon: icon,
@@ -543,17 +322,32 @@ class WorkshopPersonActions extends StatelessWidget {
         if (onPayment != null) ...[
           const SectionHeader(
               padding: _sheetHeaderPadding, title: S.workshopPaymentSection),
-          for (final (status, label, icon) in const [
+          for (final (status, label, icon) in [
             (PaymentStatus.paid, S.paymentPaid, Icons.payments_rounded),
             (PaymentStatus.unpaid, S.paymentUnpaid, Icons.money_off_rounded),
-            (null, S.paymentUnspecified, Icons.help_outline_rounded),
+            if (!binaryPayment)
+              (null, S.paymentUnspecified, Icons.help_outline_rounded),
           ])
             _ChoiceRow(
               label: label,
               icon: icon,
-              selected: status == payment,
+              selected: binaryPayment
+                  ? (status == PaymentStatus.paid) ==
+                      (payment == PaymentStatus.paid)
+                  : status == payment,
               onTap: () => onPayment!(status),
             ),
+        ],
+        if (onEdit != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: onEdit,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.edit_outlined),
+            label: Text(editLabel ?? S.workshopEditMember),
+          ),
         ],
         if (onRemove != null) ...[
           const SizedBox(height: AppSpacing.sm),
