@@ -220,6 +220,53 @@ class _Identity extends ConsumerWidget {
 /// Fails closed, and says so plainly: no raw exception, no stack, and no
 /// invitation to retry the same broken payload silently. The primary action is
 /// the ordinary sign-out, which is what actually clears the refused session.
+/// Offline, and the stored copy of the session is past its seven days.
+///
+/// **Not a sign-out.** The session may still be valid on the server, so the
+/// tokens are kept and the primary action is a retry: online, the server's
+/// answer moves the person on (back into the app, or to `/session-expired`);
+/// still offline, an inline line says so and the screen stays.
+class OfflineSessionExpiredPage extends ConsumerStatefulWidget {
+  const OfflineSessionExpiredPage({super.key});
+
+  @override
+  ConsumerState<OfflineSessionExpiredPage> createState() =>
+      _OfflineSessionExpiredPageState();
+}
+
+class _OfflineSessionExpiredPageState
+    extends ConsumerState<OfflineSessionExpiredPage> {
+  bool _retried = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = ref.watch(currentUserResultProvider).isLoading;
+    return StatusScreen(
+      icon: Icons.cloud_off_outlined,
+      tone: StatusTone.warning,
+      title: S.offlineSessionExpiredTitle,
+      body: S.offlineSessionExpiredBody,
+      detail: _retried && !busy ? S.offlineSessionStillOffline : null,
+      primaryAction: FilledButton.icon(
+        onPressed: busy
+            ? null
+            : () {
+                setState(() => _retried = true);
+                ref.invalidate(currentUserResultProvider);
+              },
+        icon: busy
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded),
+        label: const Text(S.retry),
+      ),
+      secondaryAction: const _SignOutButton(),
+    );
+  }
+}
+
 class SessionInvalidPage extends StatelessWidget {
   const SessionInvalidPage({super.key});
 
@@ -432,6 +479,7 @@ class DemoExpiredPage extends StatelessWidget {
 /// the redirect immediately bounces off — an infinite loop, not a bug you see
 /// once.
 const Map<String, Widget> startupStatusPages = {
+  '/offline-session-expired': OfflineSessionExpiredPage(),
   '/session-invalid': SessionInvalidPage(),
   '/session-unsupported': AccessUnsupportedPage(),
   '/access-not-assigned': AccessNotAssignedPage(),

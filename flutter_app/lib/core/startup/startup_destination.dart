@@ -52,6 +52,11 @@ enum StartupDestination {
   /// There was a session and it is no longer valid.
   sessionExpired(location: '/session-expired'),
 
+  /// Offline, and the stored copy of the session is past its seven days.
+  /// The session itself may still be valid: the screen asks for a
+  /// connection and a retry, never for a new sign-in.
+  offlineSessionExpired(location: '/offline-session-expired'),
+
   /// An account payload this client cannot classify — a `super_admin` carrying
   /// a tenant id, a `main_admin` carrying none. Fails closed onto its own
   /// screen rather than quietly reading as signed out, so the person is told
@@ -348,6 +353,8 @@ StartupDestination resolveStartup(StartupInputs input) {
       return StartupDestination.restoring;
     case AuthGate.expired:
       return StartupDestination.sessionExpired;
+    case AuthGate.offlineExpired:
+      return StartupDestination.offlineSessionExpired;
     case AuthGate.invalid:
       return StartupDestination.invalidSession;
     case AuthGate.signedOut:

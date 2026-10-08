@@ -408,6 +408,7 @@ void main() {
       // A typed state pointing at a dead route is the failure `§37` names:
       // the router would redirect to a location with nothing registered.
       const owned = {
+        StartupDestination.offlineSessionExpired,
         StartupDestination.invalidSession,
         StartupDestination.unsupportedAccessState,
         StartupDestination.tenantNoAccess,
