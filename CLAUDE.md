@@ -18,6 +18,7 @@ This repository contains the Flutter frontend for Leader / ليدر. Work within
 - Treat loading, empty, offline, failure, conflict, authentication, and permission states as designed screens—not afterthoughts.
 - Respect `MediaQuery.disableAnimations` and accessible navigation. Motion must clarify an interaction, never delay it.
 - Keep changes small, focused, and consistent with the existing design language. Verify with the relevant Flutter checks when the requested work includes code changes.
+- Reports and questions to the owner are written in English. Arabic is only for app UI strings.
 
 ## Brand
 
