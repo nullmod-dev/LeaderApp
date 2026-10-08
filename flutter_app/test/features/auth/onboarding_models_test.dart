@@ -140,6 +140,26 @@ void main() {
       expect(EntryVerificationPending(c).toString(),
           isNot(contains('vc_secret_handle')));
     });
+
+    test('purpose: sign_in is a returning sign-in; absent or unknown is email',
+        () {
+      final signIn =
+          VerificationChallenge.fromJson({...wire(), 'purpose': 'sign_in'});
+      expect(signIn.purpose, VerificationPurpose.signIn);
+      expect(VerificationChallenge.fromJson(signIn.toJson()), signIn,
+          reason: 'the secure-storage record keeps the purpose');
+      expect(signIn.copyWith(attemptsRemaining: 1).purpose,
+          VerificationPurpose.signIn);
+
+      final email = VerificationChallenge.fromJson(wire());
+      expect(email.purpose, VerificationPurpose.emailOwnership);
+      expect(email.toJson().containsKey('purpose'), isFalse);
+      expect(
+          VerificationChallenge.fromJson({...wire(), 'purpose': 'later'})
+              .purpose,
+          VerificationPurpose.emailOwnership);
+      expect(signIn == email, isFalse);
+    });
   });
 
   test('a Google assertion never prints its token', () {
@@ -233,6 +253,47 @@ void main() {
       ]) {
         expect(() => OnboardingSnapshot.fromJson(broken), throwsFormatException,
             reason: '$broken');
+      }
+    });
+
+    test('reads a pending Main Admin seat on an unlinked snapshot', () {
+      final unlinked = {
+        ...linked(),
+        'linkStatus': 'unlinked',
+        'tenant': null,
+        'pendingInvitation': {
+          'role': 'main_admin',
+          'tenantDisplayName': 'فريق نبض التطوعي',
+        },
+      };
+      final s = OnboardingSnapshot.fromJson(unlinked);
+      expect(
+          s.pendingInvitation,
+          const PendingInvitation(
+              tenantDisplayName: 'فريق نبض التطوعي',
+              role: AuthRole.mainAdmin));
+      expect(OnboardingSnapshot.fromJson(s.toJson()), s,
+          reason: 'it survives the secure-storage round trip');
+      expect(s.hasUnsupportedState, isFalse);
+    });
+
+    test('a pending invitation it cannot read is dropped, never fatal', () {
+      for (final raw in <Object?>[
+        'main_admin',
+        {'role': 'main_admin'},
+        {'role': 'super_admin', 'tenantDisplayName': 'x'},
+        {'role': 7, 'tenantDisplayName': 'x'},
+        {'role': 'owner', 'tenantDisplayName': 'x'},
+        {'role': 'main_admin', 'tenantDisplayName': '  '},
+      ]) {
+        final s = OnboardingSnapshot.fromJson({
+          ...linked(),
+          'linkStatus': 'unlinked',
+          'tenant': null,
+          'pendingInvitation': raw,
+        });
+        expect(s.pendingInvitation, isNull, reason: '$raw');
+        expect(s.hasUnsupportedState, isFalse, reason: '$raw');
       }
     });
 

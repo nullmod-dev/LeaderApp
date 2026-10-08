@@ -306,6 +306,19 @@ abstract class OnboardingRepository {
     required String password,
   });
 
+  /// What [email] is to the backend — registered, invited or new — so an
+  /// entry screen can offer the right way in. The one deliberate exception
+  /// to the enumeration policy (ruled 2026-10-07), bounded on the server by
+  /// a per-device and per-IP budget. Changes nothing and stores nothing.
+  Future<Result<EmailEntryStatus>> checkEmailStatus(String email);
+
+  /// Mails a sign-in code to a registered address and answers its challenge
+  /// ([VerificationPurpose.signIn]). Any other address — and a super_admin —
+  /// gets a decoy of the same shape that mails nothing and never verifies.
+  /// The code finishes through [verifyEmail] like any other challenge; a
+  /// repeat inside the resend cooldown answers the same challenge.
+  Future<Result<VerificationChallenge>> requestSignInCode(String email);
+
   /// Exchanges a Google assertion. The backend maps it to the canonical
   /// account; the client merges nothing.
   Future<Result<AuthEntryOutcome>> signInWithGoogle(

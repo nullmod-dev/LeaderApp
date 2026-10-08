@@ -20,11 +20,11 @@ import '../../entry_settle.dart';
 /// It drives the **development chooser** (`google_sign_in_button.dart`),
 /// which produces `MockOnboardingRepository`'s own `mock-google:<email>` /
 /// `mock-google-unverified:<email>` convention — so the verified, unverified
-/// and method-link paths are all exercised without a host platform rendering
-/// account UI. On Android and iOS that dialog does not exist and the same
-/// button goes to the SDK's own account chooser; everything below this line
-/// is identical either way, because the gateway hands back the same
-/// `GoogleSignInObtained` in both cases.
+/// and returning-account paths are all exercised without a host platform
+/// rendering account UI. On Android and iOS that dialog does not exist and
+/// the same button goes to the SDK's own account chooser; everything below
+/// this line is identical either way, because the gateway hands back the
+/// same `GoogleSignInObtained` in both cases.
 void main() {
   Future<(ProviderContainer, GoRouter)> boot(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 3600);
@@ -102,15 +102,21 @@ void main() {
   });
 
   testWidgets(
-      'a verified Google address on a password account is guided, never merged',
+      'Google on a verified password account asks for its sign-in code first',
       (tester) async {
     await boot(tester);
-    // `readyEmail` already has a verified password credential.
+    // `verifiedUnlinkedEmail` already has a verified password credential.
     await chooseGoogle(tester,
-        email: OnboardingFixtures.readyEmail, verified: true);
-    expect(find.textContaining(S.onboardingMethodLinkRequired), findsOneWidget);
-    // Still on /login — no session, no onboarding screen opened.
+        email: OnboardingFixtures.verifiedUnlinkedEmail, verified: true);
+    expect(find.byType(EmailVerificationPage), findsOneWidget);
+    expect(find.text(S.signInVerificationTitle), findsOneWidget);
+    expect(find.textContaining(S.onboardingMethodLinkRequired), findsNothing);
     expect(find.byType(LinkTeamPage), findsNothing);
-    expect(find.byType(EmailVerificationPage), findsNothing);
+
+    await tester.enterText(
+        find.byKey(const Key('verification-code')), kMockVerificationCode);
+    await tester.tap(find.text(S.verifyEmailAction));
+    await settleEntry(tester);
+    expect(find.byType(LinkTeamPage), findsOneWidget);
   });
 }

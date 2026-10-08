@@ -12,6 +12,7 @@ import 'package:mtm/features/auth/data/auth_providers.dart';
 import 'package:mtm/features/auth/data/mock_auth_repository.dart';
 import 'package:mtm/features/auth/data/mock_onboarding_repository.dart';
 import 'package:mtm/features/auth/data/onboarding_controller.dart';
+import 'package:mtm/features/auth/domain/onboarding_repository.dart';
 import 'package:mtm/features/auth/presentation/account_setup_page.dart';
 import 'package:mtm/features/auth/presentation/email_verification_page.dart';
 import 'package:mtm/features/auth/presentation/link_team_page.dart';
@@ -99,6 +100,97 @@ void main() {
       router.go('/signup');
       await tester.pumpAndSettle();
       expect(find.byType(SignupPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a registered address is offered its sign-in code instead',
+        (tester) async {
+      final (container, router) = await boot(tester);
+      router.go('/signup');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('signup-email')),
+          OnboardingFixtures.verifiedUnlinkedEmail);
+      await tester.enterText(
+          find.byKey(const Key('signup-password')), 'a-good-password');
+      await tester.tap(find.text(S.signUpAction));
+      await tester.pumpAndSettle();
+      expect(at(router), '/signup');
+      expect(find.byKey(const Key('signup-registered')), findsOneWidget);
+      expect(find.text(S.emailAlreadyRegistered), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('signup-send-code')));
+      await tester.pumpAndSettle();
+      expect(at(router), '/verify-email');
+      expect(find.text(S.signInVerificationTitle), findsOneWidget);
+      await tester.enterText(
+          find.byKey(const Key('verification-code')), kMockVerificationCode);
+      await tester.tap(find.text(S.verifyEmailAction));
+      await tester.pumpAndSettle();
+      expect(at(router), '/link-team');
+
+      // The password typed on the form was never sent.
+      // (The mock's latency runs on the test clock, so time is pumped.)
+      final pending = container
+          .read(onboardingRepositoryProvider)
+          .signInWithPassword(
+              email: OnboardingFixtures.verifiedUnlinkedEmail,
+              password: 'a-good-password');
+      await tester.pump(const Duration(seconds: 1));
+      expect(onboardingErrorKindOf(await pending),
+          OnboardingErrorKind.invalidCredentials);
+    });
+
+    testWidgets('editing the address takes the registered notice away',
+        (tester) async {
+      final (_, router) = await boot(tester);
+      router.go('/signup');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('signup-email')),
+          OnboardingFixtures.readyEmail);
+      await tester.enterText(
+          find.byKey(const Key('signup-password')), 'a-good-password');
+      await tester.tap(find.text(S.signUpAction));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('signup-registered')), findsOneWidget);
+      await tester.enterText(
+          find.byKey(const Key('signup-email')), 'someone.else@example.org');
+      await tester.pump();
+      expect(find.byKey(const Key('signup-registered')), findsNothing);
+    });
+
+    testWidgets('the registered notice fits 320dp at 1.6x text',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final (_, router) = await boot(tester);
+      // After `boot`, which sizes the view for itself.
+      tester.view.physicalSize = const Size(320 * 3, 900 * 3);
+      // `boot` swallows overflow reports; this test counts them instead.
+      final overflows = <String>[];
+      final harness = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.toString().contains('overflowed')) {
+          overflows.add(details.toString());
+          return;
+        }
+        harness?.call(details);
+      };
+      router.go('/signup');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('signup-email')),
+          OnboardingFixtures.readyEmail);
+      await tester.enterText(
+          find.byKey(const Key('signup-password')), 'a-good-password');
+      await tester.ensureVisible(find.text(S.signUpAction));
+      await tester.tap(find.text(S.signUpAction));
+      await tester.pumpAndSettle();
+      final notice = find.byKey(const Key('signup-registered'));
+      await tester.ensureVisible(notice);
+      await tester.pump();
+      FlutterError.onError = harness;
+      expect(tester.getRect(notice).right, lessThanOrEqualTo(320));
+      expect(overflows, isEmpty);
       expect(tester.takeException(), isNull);
     });
 

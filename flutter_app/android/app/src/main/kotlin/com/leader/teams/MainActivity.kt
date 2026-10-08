@@ -2,7 +2,7 @@ package com.leader.teams
 
 import android.os.Build
 import android.view.Display
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -23,8 +23,11 @@ import kotlin.math.abs
  * therefore *not* offered to the user at all — see `availableFrameRates` in
  * `frame_rate.dart`. Advertising 30fps on a 60Hz panel would mean throwing
  * frames away, which is the one thing this must not do.
+ *
+ * A `FlutterFragmentActivity` because the app lock's system prompt
+ * (`local_auth`, AndroidX BiometricPrompt) is a fragment.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

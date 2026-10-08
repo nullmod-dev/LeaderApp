@@ -148,16 +148,72 @@ void main() {
       expect(repo.fullSessionsIssued, 1);
     });
 
-    test('Google enters the same journey; collisions are not merged', () async {
+    test('Google enters the same journey; a returning account gets a code',
+        () async {
       await ctrl().signInWithGoogle(const GoogleIdentityAssertion(
           '${kMockGoogleVerifiedPrefix}new.google@gmail.com'));
       await container.read(currentUserResultProvider.future);
       expect(destination(), StartupDestination.teamLink);
       await ctrl().abandon();
 
-      final r = await ctrl().signInWithGoogle(const GoogleIdentityAssertion(
+      await ctrl().signInWithGoogle(const GoogleIdentityAssertion(
           '$kMockGoogleVerifiedPrefix${OnboardingFixtures.readyEmail}'));
-      expect(onboardingErrorKindOf(r), OnboardingErrorKind.methodLinkRequired);
+      final pending = state() as EntryVerificationPending;
+      expect(pending.challenge.purpose, VerificationPurpose.signIn);
+      expect(destination(), StartupDestination.emailVerification);
+      final done = await ctrl().verifyEmail(kMockVerificationCode);
+      expect((done as Success).data, isA<EntryReady>());
+      expect(state(), const EntryNone());
+    });
+  });
+
+  group('email-first entry', () {
+    test('a status check is advice: it moves no state', () async {
+      final r = await ctrl().checkEmailStatus(' Unlinked@MTM.test ');
+      expect((r as Success).data, EmailEntryStatus.registered);
+      expect(state(), const EntryNone());
+      await container.read(currentUserResultProvider.future);
+      expect(destination(), StartupDestination.signedOut);
+    });
+
+    test('a sign-in code opens the code step, and the code opens the account',
+        () async {
+      final c = await ctrl()
+          .beginEmailCodeSignIn(' ${OnboardingFixtures.verifiedUnlinkedEmail}');
+      expect(c, isA<Success<VerificationChallenge>>());
+      final pending = state() as EntryVerificationPending;
+      expect(pending.challenge.purpose, VerificationPurpose.signIn);
+      await container.read(currentUserResultProvider.future);
+      expect(destination(), StartupDestination.emailVerification);
+
+      await ctrl().verifyEmail(kMockVerificationCode);
+      expect(destination(), StartupDestination.teamLink);
+    });
+
+    test('a finished account signs in by code to a full session', () async {
+      await ctrl().beginEmailCodeSignIn(OnboardingFixtures.readyEmail);
+      final readsBefore = userReads;
+      final done = await ctrl().verifyEmail(kMockVerificationCode);
+      expect((done as Success).data, isA<EntryReady>());
+      expect(state(), const EntryNone());
+      await container.read(currentUserResultProvider.future);
+      expect(userReads, greaterThan(readsBefore));
+    });
+
+    test('a malformed address asks the server nothing', () async {
+      final calls = repo.serverCalls;
+      expect(onboardingErrorKindOf(await ctrl().checkEmailStatus('nope')),
+          OnboardingErrorKind.invalidInput);
+      expect(onboardingErrorKindOf(await ctrl().beginEmailCodeSignIn('')),
+          OnboardingErrorKind.invalidInput);
+      expect(repo.serverCalls, calls);
+      expect(state(), const EntryNone());
+    });
+
+    test('offline changes nothing', () async {
+      online = false;
+      expect(await ctrl().beginEmailCodeSignIn(OnboardingFixtures.readyEmail),
+          isA<Offline<VerificationChallenge>>());
       expect(state(), const EntryNone());
     });
   });

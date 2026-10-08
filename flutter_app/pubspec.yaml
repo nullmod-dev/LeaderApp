@@ -38,6 +38,14 @@ dependencies:
   # Security-sensitive auth/session material uses the platform keystore /
   # keychain. It must never share the ordinary preferences store above.
   flutter_secure_storage: ^10.3.3
+  # The Leader API client (`core/network/api_client.dart`). Dart-team package,
+  # the only one the backend integration guide asks for; used only when the
+  # build is given `--dart-define=LEADER_API_BASE_URL=…`.
+  http: ^1.6.0
+  # The app lock (`features/auth/data/device_authenticator.dart`): a signed-in
+  # account opens with the phone's own fingerprint/face/PIN. Flutter-team
+  # package; installed only in backend builds.
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:

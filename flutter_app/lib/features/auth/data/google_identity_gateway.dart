@@ -14,11 +14,16 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/env/build_mode.dart';
 import '../domain/onboarding_models.dart' show GoogleIdentityAssertion;
 import 'auth_providers.dart' show demoAccountsEnabledProvider;
+import 'google_sign_in_rate_window.dart';
 
 /// Android needs the OAuth web/server client id so the SDK can mint an ID
-/// token for the MTM backend audience. No identifier is committed here.
-const String googleServerClientId =
-    String.fromEnvironment('MTM_GOOGLE_SERVER_CLIENT_ID');
+/// token for the MTM backend audience. No identifier is committed here: it
+/// comes from `--dart-define-from-file=env/google.json` (`GOOGLE_WEB_CLIENT_ID`),
+/// with the older `MTM_GOOGLE_SERVER_CLIENT_ID` define still honoured.
+const String googleServerClientId = String.fromEnvironment(
+  'GOOGLE_WEB_CLIENT_ID',
+  defaultValue: String.fromEnvironment('MTM_GOOGLE_SERVER_CLIENT_ID'),
+);
 
 sealed class GoogleSignInAttempt {
   const GoogleSignInAttempt();
@@ -48,6 +53,13 @@ final class GoogleSignInNetworkFailure extends GoogleSignInAttempt {
 /// Interrupted or unknown provider failure; generic and retryable.
 final class GoogleSignInFailed extends GoogleSignInAttempt {
   const GoogleSignInFailed();
+}
+
+/// This device has spent its failed-attempt budget; the picker was not
+/// opened. [retryAfter] is display only — the backend enforces the budget.
+final class GoogleSignInRateLimited extends GoogleSignInAttempt {
+  const GoogleSignInRateLimited(this.retryAfter);
+  final Duration retryAfter;
 }
 
 abstract class GoogleIdentityGateway {
@@ -178,13 +190,17 @@ class GoogleSdkIdentityTokenClient implements GoogleIdentityTokenClient {
 }
 
 class GoogleSdkIdentityGateway implements GoogleIdentityGateway {
-  const GoogleSdkIdentityGateway(this._client);
+  const GoogleSdkIdentityGateway(this._client, {GoogleSignInRateWindow? window})
+      : _window = window;
 
   final GoogleIdentityTokenClient _client;
+  final GoogleSignInRateWindow? _window;
 
   @override
   Future<GoogleSignInAttempt> signIn() async {
     if (!_client.configured) return const GoogleSignInUnavailable();
+    final wait = await _window?.blockedFor();
+    if (wait != null) return GoogleSignInRateLimited(wait);
     try {
       final token = await _client.obtainIdToken();
       return GoogleSignInObtained(GoogleIdentityAssertion(token));
@@ -205,6 +221,7 @@ class GoogleSdkIdentityGateway implements GoogleIdentityGateway {
 final googleIdentityGatewayProvider = Provider<GoogleIdentityGateway>((ref) {
   return GoogleSdkIdentityGateway(
     GoogleSdkIdentityTokenClient(serverClientId: googleServerClientId),
+    window: ref.watch(googleSignInRateWindowProvider),
   );
 });
 

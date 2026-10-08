@@ -99,6 +99,32 @@ class GoogleIdentityAssertion {
   String toString() => 'GoogleIdentityAssertion(<redacted>)';
 }
 
+/// What the backend says an address is before anyone signs in
+/// (`POST /auth/email-status`). It picks which way in the entry screens
+/// offer; it never opens one — every path is still a server decision.
+enum EmailEntryStatus {
+  /// A verified account: a sign-in code can be mailed to it.
+  registered('registered'),
+
+  /// An invitation, or a provisioned seat nobody has claimed, waits for it.
+  invited('invited'),
+
+  /// Nothing yet: sign up, or continue with Google. Wire `new`.
+  fresh('new');
+
+  const EmailEntryStatus(this.wire);
+
+  final String wire;
+
+  /// `null` for a value this build does not know — the caller fails closed.
+  static EmailEntryStatus? tryParse(Object? wire) {
+    for (final status in values) {
+      if (status.wire == wire) return status;
+    }
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Input normalization — courtesy checks; the backend re-validates everything
 // ---------------------------------------------------------------------------
@@ -221,13 +247,30 @@ DisplayNameError? validateDisplayName(String raw) {
 // B. Email verification
 // ---------------------------------------------------------------------------
 
+/// Why a [VerificationChallenge] was issued. It changes the code screen's
+/// wording and its way out, never what the code proves.
+enum VerificationPurpose {
+  /// Proving a new or unverified address is yours.
+  emailOwnership,
+
+  /// A returning account signing in with Google: the backend mails a code to
+  /// the account's address before it opens the session (wire `sign_in`).
+  signIn;
+
+  /// An absent or unknown value reads as [emailOwnership] — the screen the
+  /// challenge always had.
+  static VerificationPurpose parse(Object? raw) =>
+      raw == 'sign_in' ? VerificationPurpose.signIn : emailOwnership;
+}
+
 /// A backend-issued email-ownership challenge. **Not a session.**
 ///
 /// Issued by sign-up (always — whether or not the address already had an
 /// account, see the enumeration policy), by a password sign-in to an
-/// unverified account, and by a Google sign-in whose token does not assert a
-/// verified address. Holding one grants nothing: only [handle] plus the code
-/// mailed to the address turns into a session.
+/// unverified account, by a Google sign-in whose token does not assert a
+/// verified address, and by a returning account's Google sign-in
+/// ([VerificationPurpose.signIn]). Holding one grants nothing: only [handle]
+/// plus the code mailed to the address turns into a session.
 @immutable
 class VerificationChallenge {
   VerificationChallenge({
@@ -237,6 +280,7 @@ class VerificationChallenge {
     DateTime? expiresAt,
     DateTime? resendAvailableAt,
     this.attemptsRemaining,
+    this.purpose = VerificationPurpose.emailOwnership,
   })  : expiresAt = expiresAt?.toUtc(),
         resendAvailableAt = resendAvailableAt?.toUtc() {
     if (handle.trim().isEmpty) throw ArgumentError('handle is empty');
@@ -270,6 +314,8 @@ class VerificationChallenge {
   /// Wrong-code attempts left on this challenge, when the backend discloses it.
   final int? attemptsRemaining;
 
+  final VerificationPurpose purpose;
+
   /// Fails toward "expired" at the instant itself.
   bool isExpiredAt(DateTime now) =>
       expiresAt != null && !now.toUtc().isBefore(expiresAt!);
@@ -297,6 +343,7 @@ class VerificationChallenge {
         expiresAt: expiresAt ?? this.expiresAt,
         resendAvailableAt: resendAvailableAt ?? this.resendAvailableAt,
         attemptsRemaining: attemptsRemaining ?? this.attemptsRemaining,
+        purpose: purpose,
       );
 
   /// Strict: a challenge without a handle or a masked destination is not a
@@ -326,6 +373,7 @@ class VerificationChallenge {
       resendAvailableAt:
           parseOnboardingInstant(j['resendAvailableAt'], 'resendAvailableAt'),
       attemptsRemaining: attempts as int?,
+      purpose: VerificationPurpose.parse(j['purpose']),
     );
   }
 
@@ -339,6 +387,7 @@ class VerificationChallenge {
         if (resendAvailableAt != null)
           'resendAvailableAt': resendAvailableAt!.toIso8601String(),
         if (attemptsRemaining != null) 'attemptsRemaining': attemptsRemaining,
+        if (purpose == VerificationPurpose.signIn) 'purpose': 'sign_in',
       };
 
   @override
@@ -349,11 +398,12 @@ class VerificationChallenge {
       other.codeLength == codeLength &&
       other.expiresAt == expiresAt &&
       other.resendAvailableAt == resendAvailableAt &&
-      other.attemptsRemaining == attemptsRemaining;
+      other.attemptsRemaining == attemptsRemaining &&
+      other.purpose == purpose;
 
   @override
   int get hashCode => Object.hash(handle, maskedEmail, codeLength, expiresAt,
-      resendAvailableAt, attemptsRemaining);
+      resendAvailableAt, attemptsRemaining, purpose);
 
   @override
   String toString() => 'VerificationChallenge(<redacted>, $maskedEmail, '
@@ -446,6 +496,46 @@ class LinkedTenant {
   int get hashCode => Object.hash(displayName, role, status);
 }
 
+/// A Main Admin seat waiting for this address, as the backend names it to an
+/// unlinked account before the Team Code is typed: the team's display name
+/// and the role, nothing that could stand in for the code.
+///
+/// **Advice, never a gate.** It changes what `/link-team` says, not where
+/// the classifier routes, so a value this build cannot read is dropped
+/// rather than failing the snapshot closed.
+@immutable
+class PendingInvitation {
+  const PendingInvitation({
+    required this.tenantDisplayName,
+    required this.role,
+  });
+
+  final String tenantDisplayName;
+  final AuthRole role;
+
+  static PendingInvitation? tryParse(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final name = raw['tenantDisplayName'];
+    final wire = raw['role'];
+    final role = wire is String ? AuthRole.parse(wire) : null;
+    if (name is! String || name.trim().isEmpty) return null;
+    if (role == null || !role.belongsToSaasTenant) return null;
+    return PendingInvitation(tenantDisplayName: name, role: role);
+  }
+
+  Map<String, dynamic> toJson() =>
+      {'role': role.wire, 'tenantDisplayName': tenantDisplayName};
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingInvitation &&
+      other.tenantDisplayName == tenantDisplayName &&
+      other.role == role;
+
+  @override
+  int get hashCode => Object.hash(tenantDisplayName, role);
+}
+
 // ---------------------------------------------------------------------------
 // D. Account setup
 // ---------------------------------------------------------------------------
@@ -511,6 +601,7 @@ class OnboardingSnapshot {
     required this.setup,
     this.displayNameSuggestion,
     DateTime? authorizationExpiresAt,
+    this.pendingInvitation,
     Map<OnboardingField, String> unsupported = const {},
   })  : methods = Set.unmodifiable(methods),
         authorizationExpiresAt = authorizationExpiresAt?.toUtc(),
@@ -561,6 +652,9 @@ class OnboardingSnapshot {
   /// being completable. Server time; display only.
   final DateTime? authorizationExpiresAt;
 
+  /// A Main Admin seat waiting for this unlinked address. Display only.
+  final PendingInvitation? pendingInvitation;
+
   /// Gating fields whose value this build does not know, with the raw value.
   final Map<OnboardingField, String> unsupported;
 
@@ -592,6 +686,7 @@ class OnboardingSnapshot {
         displayNameSuggestion:
             displayNameSuggestion ?? this.displayNameSuggestion,
         authorizationExpiresAt: authorizationExpiresAt,
+        pendingInvitation: pendingInvitation,
         unsupported: unsupported,
       );
 
@@ -685,6 +780,7 @@ class OnboardingSnapshot {
             : null,
         authorizationExpiresAt: parseOnboardingInstant(
             j['authorizationExpiresAt'], 'authorizationExpiresAt'),
+        pendingInvitation: PendingInvitation.tryParse(j['pendingInvitation']),
         unsupported: unsupported,
       );
     } on ArgumentError catch (e) {
@@ -717,6 +813,8 @@ class OnboardingSnapshot {
           'displayNameSuggestion': displayNameSuggestion,
         if (authorizationExpiresAt != null)
           'authorizationExpiresAt': authorizationExpiresAt!.toIso8601String(),
+        if (pendingInvitation != null)
+          'pendingInvitation': pendingInvitation!.toJson(),
       };
 
   @override
@@ -731,11 +829,12 @@ class OnboardingSnapshot {
       other.setup == setup &&
       other.displayNameSuggestion == displayNameSuggestion &&
       other.authorizationExpiresAt == authorizationExpiresAt &&
+      other.pendingInvitation == pendingInvitation &&
       mapEquals(other.unsupported, unsupported);
 
   @override
   int get hashCode => Object.hash(accountId, email, account, link, tenant,
-      setup, displayNameSuggestion, authorizationExpiresAt);
+      setup, displayNameSuggestion, authorizationExpiresAt, pendingInvitation);
 
   @override
   String toString() => 'OnboardingSnapshot($accountId, ${account.wire}, '

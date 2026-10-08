@@ -6,14 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/display/display_refresh.dart';
 import 'core/motion/motion_level.dart';
+import 'core/network/api_config.dart';
+import 'core/network/backend_overrides.dart';
 import 'core/router/app_router.dart';
 import 'core/startup/intro_gate.dart';
 import 'core/storage/local_store.dart';
 import 'core/sync/sync_scheduler.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/auth/data/app_lock_controller.dart';
 import 'features/auth/data/auth_providers.dart' show localStoreProvider;
 import 'features/auth/data/onboarding_controller.dart';
+import 'features/auth/presentation/app_lock_gate.dart';
 import 'features/conflict/data/conflict_review_recording.dart';
 import 'features/settings/data/device_settings_bootstrap.dart';
 import 'features/settings/data/frame_rate_provider.dart';
@@ -49,6 +53,12 @@ Future<void> main() async {
   // signing out, tab changes and returning from the background cannot replay
   // it. See `core/startup/intro_gate.dart`.
   IntroGate.armColdLaunch();
+  // Which data source this build talks to — logged once, debug builds only.
+  if (kDebugMode) {
+    debugPrint(isBackendConfigured
+        ? 'Leader API: $apiOrigin'
+        : 'Leader API: none (LEADER_API_BASE_URL empty — mock repositories)');
+  }
   // The composition root installs the conflict feature's review recorder
   // over `core/sync`'s no-op hook, and the Shift feature's composer/applier
   // over `features/conflict`'s empty registries, so a conflict classified by
@@ -58,7 +68,12 @@ Future<void> main() async {
   runApp(ProviderScope(
     overrides: [
       localStoreProvider.overrideWithValue(localStore),
-      settingsRepositoryProvider.overrideWithValue(settingsRepository),
+      // A backend build points every repository seam at the Leader API;
+      // device-level settings stay on the repository hydrated above.
+      if (isBackendConfigured)
+        ...backendOverrides(deviceSettings: settingsRepository)
+      else
+        settingsRepositoryProvider.overrideWithValue(settingsRepository),
       deviceSettingsSnapshotProvider.overrideWithValue(deviceSettings),
       displayRefreshProvider.overrideWithValue(displayRefresh),
       ...conflictReviewOverrides,
@@ -110,7 +125,11 @@ class _MtmAppState extends ConsumerState<MtmApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      ref.read(appLockControllerProvider.notifier).onBackgrounded();
+    }
     if (state == AppLifecycleState.resumed) {
+      ref.read(appLockControllerProvider.notifier).onResumed();
       _applyAndroidSystemUi();
       ref.read(syncSchedulerProvider).onAppResumed();
     }
@@ -159,7 +178,9 @@ class _MtmAppState extends ConsumerState<MtmApp> with WidgetsBindingObserver {
             // The stored value was available before runApp. Accessibility
             // still wins inside motionSpec(), including on the first frame.
             level: motion,
-            child: child ?? const SizedBox.shrink(),
+            // The app lock covers a signed-in session until the phone's own
+            // screen lock is proved; the router underneath stays as it was.
+            child: AppLockGate(child: child ?? const SizedBox.shrink()),
           ),
         );
       },

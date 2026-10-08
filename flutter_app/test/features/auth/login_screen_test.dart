@@ -12,15 +12,21 @@ import 'package:mtm/core/theme/app_palette.dart';
 import 'package:mtm/core/theme/app_theme.dart';
 import 'package:mtm/core/theme/theme_controller.dart';
 import 'package:mtm/core/widgets/made_in_iraq.dart';
+import 'package:mtm/features/auth/data/auth_entry_email_provider.dart';
 import 'package:mtm/features/auth/data/auth_providers.dart';
 import 'package:mtm/features/auth/data/mock_auth_repository.dart';
+import 'package:mtm/features/auth/data/mock_onboarding_repository.dart';
+import 'package:mtm/features/auth/presentation/email_verification_page.dart';
 import 'package:mtm/features/auth/presentation/entry_glass.dart';
 import 'package:mtm/features/auth/presentation/google_sign_in_button.dart';
 import 'package:mtm/features/auth/presentation/login_page.dart';
+import 'package:mtm/features/auth/presentation/signup_page.dart';
 import 'package:mtm/features/settings/data/settings_providers.dart';
 import 'package:mtm/features/settings/domain/settings_models.dart';
 import 'package:mtm/features/settings/domain/settings_repository.dart';
 import 'package:mtm/l10n/strings.dart';
+
+import '../../entry_settle.dart';
 
 /// The Leader sign-in screen.
 ///
@@ -364,6 +370,105 @@ void main() {
         expect(tester.getRect(target).height, greaterThanOrEqualTo(48),
             reason: name);
       }
+    });
+  });
+
+  group('the email-code way in', () {
+    final codeButton = find.byKey(const Key('login-email-code'));
+
+    Future<void> requestCode(WidgetTester tester, String email) async {
+      await tester.enterText(find.byKey(LoginField.keyFor(S.emailLabel)), email);
+      // Focus scrolls the field into view; a scrolling view takes no tap, so
+      // that settles first.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(codeButton);
+      await tester.pump();
+      await tester.tap(codeButton);
+      await settleEntry(tester);
+    }
+
+    testWidgets('sits under Google as its sibling, and clears 48dp',
+        (tester) async {
+      await boot(tester);
+      expect(find.text(S.emailCodeSignIn), findsOneWidget);
+      final google = tester.getRect(find.byKey(const Key('google-sign-in')));
+      final code = tester.getRect(codeButton);
+      expect(code.top, greaterThan(google.bottom));
+      expect(code.height, greaterThanOrEqualTo(48));
+      expect(code.width, google.width);
+    });
+
+    testWidgets('an empty address is asked for, and nothing is sent',
+        (tester) async {
+      await boot(tester);
+      await tester.ensureVisible(codeButton);
+      await tester.pump();
+      await tester.tap(codeButton);
+      await tester.pump();
+      expect(find.text(S.emailCodeNeedsEmail), findsOneWidget);
+      expect(find.byType(LoginPage), findsOneWidget);
+    });
+
+    testWidgets('a registered address goes to its sign-in code',
+        (tester) async {
+      await boot(tester);
+      await requestCode(tester, OnboardingFixtures.verifiedUnlinkedEmail);
+      expect(find.byType(EmailVerificationPage), findsOneWidget);
+      expect(find.text(S.signInVerificationTitle), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('no account yet: sign-up is offered, the address carried over',
+        (tester) async {
+      final (container, _) = await boot(tester);
+      await requestCode(tester, 'new.person@example.org');
+      expect(find.byKey(const Key('login-email-advice')), findsOneWidget);
+      expect(find.text(S.emailEntryFresh), findsOneWidget);
+      expect(find.byType(EmailVerificationPage), findsNothing,
+          reason: 'nobody is sent to wait for a code that never comes');
+
+      final signUp = find.byKey(const Key('login-email-advice-signup'));
+      await tester.ensureVisible(signUp);
+      await tester.pump();
+      expect(tester.getRect(signUp).height, greaterThanOrEqualTo(44));
+      await tester.tap(signUp);
+      await settleEntry(tester);
+      expect(find.byType(SignupPage), findsOneWidget);
+      expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('signup-email')))
+              .controller!
+              .text,
+          'new.person@example.org');
+      expect(container.read(authEntryEmailProvider), isNull,
+          reason: 'handed over once, then forgotten');
+    });
+
+    testWidgets('an invitation is named', (tester) async {
+      await boot(tester);
+      await requestCode(tester, OnboardingFixtures.hilalInviteeEmail);
+      expect(find.text(S.emailEntryInvited), findsOneWidget);
+    });
+
+    testWidgets('editing the address takes its advice away', (tester) async {
+      await boot(tester);
+      await requestCode(tester, 'new.person@example.org');
+      expect(find.byKey(const Key('login-email-advice')), findsOneWidget);
+      await tester.enterText(
+          find.byKey(LoginField.keyFor(S.emailLabel)), 'other@example.org');
+      await tester.pump();
+      expect(find.byKey(const Key('login-email-advice')), findsNothing);
+    });
+
+    testWidgets('fits 320dp at 1.6x text with the advice open',
+        (tester) async {
+      await boot(tester, width: 320, textScale: 1.6);
+      await requestCode(tester, OnboardingFixtures.hilalInviteeEmail);
+      final advice = find.byKey(const Key('login-email-advice'));
+      await tester.ensureVisible(advice);
+      await tester.pump();
+      expect(tester.getRect(advice).right, lessThanOrEqualTo(320));
+      expect(tester.takeException(), isNull);
     });
   });
 

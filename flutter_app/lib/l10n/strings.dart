@@ -2654,6 +2654,12 @@ abstract final class S {
   static const startupRestoring = 'جارٍ فتح التطبيق';
   static const startupRestoringSub = 'يتم استعادة الجلسة على هذا الجهاز.';
 
+  static const offlineSessionExpiredTitle = 'انتهت صلاحية الدخول دون اتصال';
+  static const offlineSessionExpiredBody =
+      'مرّت ٧ أيام على تسجيل دخولك. اتصل بالإنترنت ثم أعد المحاولة.';
+  static const offlineSessionStillOffline =
+      'ما زلت دون اتصال. تحقّق من الشبكة ثم أعد المحاولة.';
+
   static const sessionInvalidTitle = 'بيانات الحساب غير صالحة';
   static const sessionInvalidBody =
       'وصلت بيانات هذا الحساب بشكل غير مكتمل، ولا يمكن فتح التطبيق بها.';
@@ -2751,6 +2757,38 @@ abstract final class S {
   static const useAnotherEmail = 'استخدام بريد آخر';
   static const attemptsRemainingLabel = 'المحاولات المتبقية: ';
 
+  // A returning account's Google sign-in: the code screen, worded for it.
+  static const signInVerificationTitle = 'رمز تسجيل الدخول';
+  static const signInCodeSentTo = 'أرسلنا رمز تسجيل الدخول إلى ';
+  static const useAnotherAccount = 'استخدام حساب آخر';
+
+  // Email-first entry: a sign-in by a mailed code alone, and what an address
+  // is before anyone signs in (`/auth/email-status`).
+  static const emailCodeSignIn = 'الدخول برمز يصل إلى بريدك';
+  static const emailCodeChecking = 'جارٍ التحقق…';
+  static const emailCodeNeedsEmail =
+      'اكتب بريدك الإلكتروني أولاً، وسنرسل إليه رمز الدخول.';
+  static const emailEntryFresh =
+      'لا يوجد حساب بهذا البريد بعد. أنشئ حساباً به، أو تابع باستخدام Google.';
+  static const emailEntryInvited =
+      'لديك دعوة من فريق على هذا البريد. أنشئ حسابك به، أو تابع باستخدام Google.';
+  static const createAccountWithEmail = 'إنشاء حساب بهذا البريد';
+  static const emailAlreadyRegistered =
+      'هذا البريد مسجَّل بالفعل. سجّل الدخول برمز يصل إليه بدلاً من إنشاء حساب جديد.';
+  static const sendSignInCode = 'أرسل رمز الدخول';
+
+  // The app lock: a signed-in session opens with the phone's own screen lock.
+  static const appLockTitle = 'تأكيد هويتك';
+  static const appLockSubtitle =
+      'افتح $productNameAr ببصمتك أو بقفل شاشة هاتفك.';
+  static const appLockPromptReason = 'تأكيد هويتك لفتح $productNameAr';
+  static const appLockUnlock = 'فتح القفل';
+  static const appLockCancelled = 'لم يكتمل التحقق. حاول مرة أخرى.';
+  static const appLockLockedOut =
+      'محاولات كثيرة. افتح قفل هاتفك أولاً، ثم حاول مرة أخرى.';
+  static const appLockFailed = 'تعذّر التحقق. حاول مرة أخرى.';
+  static const appLockSignOut = 'تسجيل الدخول بحساب آخر';
+
   static const signedInAs = 'مسجَّل باسم ';
   static const teamCodeLabel = 'رمز الفريق';
   static const teamCodeHint = 'MTM-XXXX-XXXX';
@@ -2761,6 +2799,11 @@ abstract final class S {
       'هل دعاك مدير فريقك؟ لا تحتاج إلى رمز الفريق: اطلب منه إرسال الدعوة '
       'إلى هذا البريد، ثم تحقّق منها هنا.';
   static const checkInvitationAction = 'التحقق من الدعوة';
+  // A Main Admin seat waiting for this address, named before the Team Code:
+  // prefix + the team's name + suffix.
+  static const teamLinkPendingInvitationPrefix = 'لديك دعوة لإدارة «';
+  static const teamLinkPendingInvitationSuffix =
+      '» — أدخل رمز الفريق الذي يصلك من فريق $productNameAr.';
   static const noInvitationYet = 'لا توجد دعوة صالحة لهذا البريد بعد.';
 
   static const displayNameLabel = 'الاسم الظاهر';
@@ -2806,6 +2849,8 @@ abstract final class S {
   static const onboardingSessionEnded =
       'انتهت هذه الجلسة. سجّل الدخول من جديد.';
   static const onboardingRateLimited = 'محاولات كثيرة. حاول لاحقاً.';
+  static const googleSignInRateLimited =
+      'محاولات دخول كثيرة عبر Google لم تنجح. حاول مجدداً بعد ';
   static const onboardingTemporaryFailure = 'حدث خطأ مؤقت. حاول مرة أخرى.';
   static const onboardingUnknownError = 'حدث خطأ غير متوقع.';
 

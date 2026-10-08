@@ -6,6 +6,7 @@ import '../../demo/domain/demo_policy.dart';
 import '../domain/auth_models.dart';
 import '../domain/customer_demo.dart';
 import 'auth_providers.dart';
+import 'http_auth_repository.dart';
 import 'mock_auth_repository.dart';
 import 'onboarding_controller.dart';
 
@@ -44,7 +45,16 @@ class CustomerDemoController extends Notifier<bool> {
       return const Failure('', code: 'demo_unavailable');
     }
     final repository = ref.read(authRepositoryProvider);
-    if (repository is! MockAuthRepository) {
+    // The demo stays local with the backend too (decision D4): both
+    // repositories install the same in-memory demo identity.
+    final Future<Result<AuthUser>> Function({
+      required CustomerDemoPolicy policy,
+    })? startDemo = switch (repository) {
+      final MockAuthRepository mock => mock.startCustomerDemo,
+      final HttpAuthRepository http => http.startCustomerDemo,
+      _ => null,
+    };
+    if (startDemo == null) {
       // A production repository owns the real start endpoint. Until it is
       // wired, fail closed instead of manufacturing a local tenant session.
       return const Failure('', code: 'demo_unavailable');
@@ -68,7 +78,7 @@ class CustomerDemoController extends Notifier<bool> {
       if (registration is! Success<DemoSession>) {
         return const Failure('', code: 'demo_unavailable');
       }
-      final result = await repository.startCustomerDemo(policy: policy);
+      final result = await startDemo(policy: policy);
       if (!result.isSuccess) {
         // Nothing was started, so nothing may stay on the operator's list —
         // and a trial nobody was ever in is not a trial that ended early, so

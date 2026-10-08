@@ -29,3 +29,13 @@ graphify-out/
 
 # ---- Generated report samples (regenerate via report export flows) ----
 output/
+
+# ---- Local secrets and per-machine config (never commit) ----
+# The Google OAuth notes hold a client secret; resend.md holds an API key.
+# env/*.json carries real ids for --dart-define-from-file; only the
+# *.example.json placeholders are tracked.
+google_clients.md
+google_auth.md
+resend.md
+flutter_app/env/*.json
+!flutter_app/env/*.example.json

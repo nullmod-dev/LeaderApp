@@ -10,6 +10,7 @@ import '../domain/auth_models.dart';
 import '../domain/onboarding_models.dart';
 import '../domain/onboarding_repository.dart';
 import 'auth_providers.dart';
+import 'google_sign_in_rate_window.dart';
 import 'mock_auth_repository.dart';
 import 'mock_onboarding_repository.dart';
 
@@ -108,6 +109,8 @@ enum OnboardingOperation {
   refresh,
   link,
   setup,
+  emailStatus,
+  signInCode,
 }
 
 /// The single owner of the pre-session journey (machines A–D feeding E).
@@ -295,16 +298,47 @@ class OnboardingController extends Notifier<AuthEntryState> {
     );
   }
 
+  /// What [email] is to the backend, so a screen can offer the right way
+  /// in. Changes no state: the answer is advice for a screen, never a step of
+  /// the journey.
+  Future<Result<EmailEntryStatus>> checkEmailStatus(String email) {
+    if (validateLoginEmail(email) != null) {
+      return Future.value(const Failure('', code: 'validation'));
+    }
+    return _once(OnboardingOperation.emailStatus,
+        () => _repo.checkEmailStatus(normalizeLoginEmail(email)));
+  }
+
+  /// Asks for a sign-in code for [email] and moves the journey to the code
+  /// step — `/verify-email`, worded for a sign-in. An address without an
+  /// account gets a decoy that looks the same and never verifies; callers
+  /// ask [checkEmailStatus] first so nobody is sent to wait for it.
+  Future<Result<VerificationChallenge>> beginEmailCodeSignIn(String email) {
+    if (validateLoginEmail(email) != null) {
+      return Future.value(const Failure('', code: 'validation'));
+    }
+    return _entry(
+      OnboardingOperation.signInCode,
+      () => _repo.requestSignInCode(normalizeLoginEmail(email)),
+      onSuccess: (challenge) => state = EntryVerificationPending(challenge),
+    );
+  }
+
   Future<Result<AuthEntryOutcome>> signInWithGoogle(
     GoogleIdentityAssertion assertion,
   ) =>
       _entry(
         OnboardingOperation.google,
-        () => _repo.signInWithGoogle(
-          assertion,
-          idempotencyKey:
-              _keyFor(OnboardingOperation.google, [assertion.idToken]),
-        ),
+        () async {
+          final result = await _repo.signInWithGoogle(
+            assertion,
+            idempotencyKey:
+                _keyFor(OnboardingOperation.google, [assertion.idToken]),
+          );
+          // The device's copy of the backend's failed-attempt budget.
+          await ref.read(googleSignInRateWindowProvider).record(result);
+          return result;
+        },
         onSuccess: _apply,
       );
 

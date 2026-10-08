@@ -30,6 +30,11 @@ const int kMockVerificationAttempts = 5;
 const int kMockFailureBudget = 5;
 const Duration kMockLockout = Duration(minutes: 15);
 
+/// The server's per-device email-entry budget: every `/auth/email-status`
+/// and `/auth/sign-in/code` request counts, from one shared allowance.
+const int kMockEmailEntryBudget = 20;
+const Duration kMockEmailEntryWindow = Duration(hours: 1);
+
 /// The password every seeded fixture account signs in with.
 const String kMockFixturePassword = 'mtm-fixture-pass';
 
@@ -384,11 +389,21 @@ class _Challenge {
     required this.accountId,
     required this.expiresAt,
     required this.resendAt,
+    this.persona,
+    this.linkGoogle = false,
   });
 
   /// `null` for a decoy (sign-up with an already-registered address): the
   /// challenge looks identical and can never be satisfied.
   final String? accountId;
+
+  /// A development persona's sign-in code: the persona is the account, so a
+  /// correct code issues its full session. Never set outside debug builds.
+  final AuthUser? persona;
+
+  /// A returning password account's Google sign-in: Google becomes one of its
+  /// methods only when this code is right — never before.
+  final bool linkGoogle;
   DateTime expiresAt;
   DateTime resendAt;
   int attemptsLeft = kMockVerificationAttempts;
@@ -413,6 +428,13 @@ class MockOnboardingServer {
   final Map<String, _Budget> _budgetsByKey = {};
   final Set<String> exchanged = {};
   final Map<String, String> restrictedSessions = {};
+
+  /// Normalized address → its latest sign-in code challenge handle, so a
+  /// repeat inside the resend cooldown answers the same challenge.
+  final Map<String, String> signInCodeHandles = {};
+
+  /// When each email-entry request arrived, inside the current window.
+  final List<DateTime> emailEntryRequests = [];
 
   bool initialized = false;
   int sequence = 0;
@@ -653,12 +675,20 @@ class MockOnboardingRepository implements OnboardingRepository {
     return '${email[0]}***${email.substring(at)}';
   }
 
-  VerificationChallenge _issueChallenge(String? accountId, String email) {
+  VerificationChallenge _issueChallenge(
+    String? accountId,
+    String email, {
+    VerificationPurpose purpose = VerificationPurpose.emailOwnership,
+    AuthUser? persona,
+    bool linkGoogle = false,
+  }) {
     final handle = 'vc_${++_seq}';
     final c = _Challenge(
       accountId: accountId,
       expiresAt: _now.add(kMockCodeValidity),
       resendAt: _now.add(kMockResendCooldown),
+      persona: persona,
+      linkGoogle: linkGoogle,
     );
     _challenges[handle] = c;
     final challenge = VerificationChallenge(
@@ -667,6 +697,7 @@ class MockOnboardingRepository implements OnboardingRepository {
       expiresAt: c.expiresAt,
       resendAvailableAt: c.resendAt,
       attemptsRemaining: c.attemptsLeft,
+      purpose: purpose,
     );
     _heldChallenge = challenge;
     _clearRestrictedSession();
@@ -718,8 +749,26 @@ class MockOnboardingRepository implements OnboardingRepository {
           : AccountSetupStatus.required,
       displayNameSuggestion: a.displayName ?? auth?.seed.suggestedName,
       authorizationExpiresAt: auth?.expiresAt,
+      pendingInvitation: auth == null ? _pendingSeat(a) : null,
     );
     return snapshot;
+  }
+
+  /// The backend's `pendingInvitation`: a usable Main Admin seat of an
+  /// active tenant, waiting for this unlinked address.
+  PendingInvitation? _pendingSeat(_Account a) {
+    for (final auth in _authorizations.values) {
+      final seed = auth.seed;
+      if (seed.mainAdminKind == null || seed.email != a.email) continue;
+      if (auth.withdrawn || auth.consumed) continue;
+      final expiresAt = auth.expiresAt;
+      if (expiresAt != null && !_now.isBefore(expiresAt)) continue;
+      final tenant = _tenants[seed.tenantId];
+      if (tenant == null || tenant.status != SaasTenantStatus.active) continue;
+      return PendingInvitation(
+          tenantDisplayName: tenant.displayName, role: seed.role);
+    }
+    return null;
   }
 
   /// The one place a verified credential becomes a session.
@@ -899,6 +948,7 @@ class MockOnboardingRepository implements OnboardingRepository {
             expiresAt: serverChallenge.expiresAt,
             resendAvailableAt: serverChallenge.resendAt,
             attemptsRemaining: serverChallenge.attemptsLeft,
+            purpose: challenge.purpose,
           );
           _heldChallenge = refreshed;
           await _authState.writeVerification(refreshed);
@@ -960,12 +1010,17 @@ class MockOnboardingRepository implements OnboardingRepository {
       if (checkPasswordInput(password) != null) {
         return const OnboardingFailure(OnboardingProblemCode.passwordRejected);
       }
+      final persona = _persona(e);
       final existing = _byEmail(e);
-      if (existing != null && existing.verified && existing.hasCredential) {
-        // Anti-enumeration: the same answer as a fresh sign-up, a challenge
-        // that can never be satisfied. The real owner is told by email. Not
-        // even the throttle may differ, or it becomes the oracle.
+      if (persona?.user.role == AuthRole.superAdmin) {
+        // The platform never opens to an email code: a decoy shaped like a
+        // fresh sign-up's answer. The owner is told by email.
         return Success(_issueChallenge(null, e));
+      }
+      if (persona != null || (existing != null && existing.verified)) {
+        // Already registered: the code signs them in, and the typed password
+        // is dropped — never stored, never compared.
+        return Success(_signInChallengeFor(e));
       }
       final account = existing ?? _newAccount(e);
       // An unverified credential proved nothing, so a new sign-up replaces it
@@ -1024,6 +1079,106 @@ class MockOnboardingRepository implements OnboardingRepository {
     return _persistEntry(Success(_enter(account)));
   }
 
+  /// The server's one budget for both email-entry calls: every request
+  /// counts, refused or not, because an answer is what a prober is after.
+  OnboardingFailure<T>? _emailEntryThrottled<T>() {
+    final requests = _server.emailEntryRequests
+      ..removeWhere((at) => !_now.isBefore(at.add(kMockEmailEntryWindow)));
+    if (requests.length >= kMockEmailEntryBudget) {
+      return OnboardingFailure<T>(OnboardingProblemCode.rateLimited,
+          retryAvailableAt: requests.first.add(kMockEmailEntryWindow));
+    }
+    requests.add(_now);
+    return null;
+  }
+
+  /// A development persona behind [email], when this build allows them. The
+  /// personas are full accounts the onboarding fixtures do not hold.
+  DevTestCredential? _persona(String email) =>
+      demoAccountsAllowed && _enabled ? DevTestCredentials.forEmail(email) : null;
+
+  /// The server's `registered`: a verified account (no customer demo here).
+  bool _isRegistered(String email) =>
+      _persona(email) != null || (_byEmail(email)?.verified ?? false);
+
+  @override
+  Future<Result<EmailEntryStatus>> checkEmailStatus(String email) async {
+    final gated = await _gate<EmailEntryStatus>();
+    if (gated != null) return gated;
+    final throttled = _emailEntryThrottled<EmailEntryStatus>();
+    if (throttled != null) return throttled;
+    if (validateLoginEmail(email) != null) {
+      return const Failure('', code: 'validation');
+    }
+    final e = normalizeLoginEmail(email);
+    if (_isRegistered(e)) return const Success(EmailEntryStatus.registered);
+    final invitation = _authorizations.values.any((a) {
+      if (a.seed.email != e || a.withdrawn || a.consumed) return false;
+      final expiresAt = a.expiresAt;
+      return expiresAt == null || _now.isBefore(expiresAt);
+    });
+    // A provisioned seat account: unverified, and no credential yet.
+    final account = _byEmail(e);
+    final provisioned = account != null && !account.hasCredential;
+    return Success(invitation || provisioned
+        ? EmailEntryStatus.invited
+        : EmailEntryStatus.fresh);
+  }
+
+  @override
+  Future<Result<VerificationChallenge>> requestSignInCode(String email) async {
+    final gated = await _gate<VerificationChallenge>();
+    if (gated != null) return gated;
+    final throttled = _emailEntryThrottled<VerificationChallenge>();
+    if (throttled != null) return throttled;
+    if (validateLoginEmail(email) != null) {
+      return const Failure('', code: 'validation');
+    }
+    return _persistChallenge(
+        Success(_signInChallengeFor(normalizeLoginEmail(email))));
+  }
+
+  /// The server's `signInChallenge`, shared by a code request and by a
+  /// sign-up on a registered address. Inside its resend cooldown the same
+  /// challenge answers again, so a second tap mails nothing new.
+  VerificationChallenge _signInChallengeFor(String e) {
+    final held = _server.signInCodeHandles[e];
+    final current = held == null ? null : _challenges[held];
+    if (current != null &&
+        _now.isBefore(current.resendAt) &&
+        _now.isBefore(current.expiresAt)) {
+      final challenge = VerificationChallenge(
+        handle: held!,
+        maskedEmail: _mask(e),
+        expiresAt: current.expiresAt,
+        resendAvailableAt: current.resendAt,
+        attemptsRemaining: current.attemptsLeft,
+        purpose: VerificationPurpose.signIn,
+      );
+      _heldChallenge = challenge;
+      return challenge;
+    }
+    final persona = _persona(e);
+    final account = _byEmail(e);
+    final VerificationChallenge challenge;
+    if (persona != null) {
+      // An email code alone never opens the platform: the decoy.
+      challenge = _issueChallenge(null, e,
+          purpose: VerificationPurpose.signIn,
+          persona: persona.user.role == AuthRole.superAdmin
+              ? null
+              : persona.user);
+    } else if (account != null && account.verified) {
+      _challenges.removeWhere((_, c) => c.accountId == account.accountId);
+      challenge = _issueChallenge(account.accountId, e,
+          purpose: VerificationPurpose.signIn);
+    } else {
+      challenge = _issueChallenge(null, e, purpose: VerificationPurpose.signIn);
+    }
+    _server.signInCodeHandles[e] = challenge.handle;
+    return challenge;
+  }
+
   @override
   Future<Result<AuthEntryOutcome>> signInWithGoogle(
     GoogleIdentityAssertion assertion, {
@@ -1051,15 +1206,30 @@ class MockOnboardingRepository implements OnboardingRepository {
             OnboardingProblemCode.googleAssertionRejected);
       }
       final e = normalizeLoginEmail(raw);
-      var account = _byEmail(e);
+      final persona = _persona(e);
+      if (persona != null) {
+        // A persona is a returning, verified account too. Google has proved
+        // the identity, so the Super Admin's code is real here.
+        return Success(EntryVerificationRequired(_issueChallenge(null, e,
+            purpose: VerificationPurpose.signIn, persona: persona.user)));
+      }
+      final existing = _byEmail(e);
+      if (existing != null && existing.verified) {
+        // A returning account proves its mailbox again, with a code, before
+        // the session opens. A password account gains Google only when that
+        // code is right; its password stays.
+        _challenges.removeWhere((_, c) => c.accountId == existing.accountId);
+        return Success(EntryVerificationRequired(_issueChallenge(
+          existing.accountId,
+          e,
+          purpose: VerificationPurpose.signIn,
+          linkGoogle: !existing.google,
+        )));
+      }
+      var account = existing;
       if (account == null) {
         account = _newAccount(e)..google = true;
       } else if (!account.google) {
-        if (account.password != null && account.verified) {
-          // Never merged automatically: prove the password first.
-          return const OnboardingFailure(
-              OnboardingProblemCode.authMethodLinkRequired);
-        }
         // Unclaimed (provisioned) or unverified-password: Google's verified
         // assertion is the stronger claim; an unverified password is dropped.
         account
@@ -1098,7 +1268,9 @@ class MockOnboardingRepository implements OnboardingRepository {
             OnboardingProblemCode.verificationCodeExpired);
       }
       final accountId = c.accountId;
-      if (accountId == null || code != kMockVerificationCode) {
+      final persona = c.persona;
+      if ((accountId == null && persona == null) ||
+          code != kMockVerificationCode) {
         c.attemptsLeft--;
         if (c.attemptsLeft <= 0) {
           _challenges.remove(handle);
@@ -1114,7 +1286,14 @@ class MockOnboardingRepository implements OnboardingRepository {
             attemptsRemaining: c.attemptsLeft);
       }
       _challenges.remove(handle);
+      if (persona != null) {
+        _heldChallenge = null;
+        fullSessionsIssued++;
+        _pendingFullSessionUser = persona;
+        return const Success(EntryReady());
+      }
       final account = _accounts[accountId]!..verified = true;
+      if (c.linkGoogle) account.google = true;
       return Success(_enter(account));
     });
     if (result

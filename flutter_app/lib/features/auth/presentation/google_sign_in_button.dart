@@ -36,7 +36,7 @@ import '../domain/onboarding_models.dart';
 /// chooser exists: there a small in-app dialog produces the same
 /// `mock-google:<email>` / `mock-google-unverified:<email>` convention
 /// `MockOnboardingRepository` already expects, so the verified, unverified and
-/// method-link-required paths stay reachable in this repository's tests. See
+/// returning-account paths stay reachable in this repository's tests. See
 /// [googleDevelopmentChooserProvider] — it is `false` on Android and iOS, and
 /// absent altogether from a release artefact.
 class GoogleSignInButton extends ConsumerStatefulWidget {

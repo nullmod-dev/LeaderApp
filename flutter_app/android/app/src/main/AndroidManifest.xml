@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The Leader API (`LEADER_API_BASE_URL`): every build that talks to the
+         backend needs the network, release included. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- The app lock: fingerprint/face through the phone's own prompt. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <application
         android:label="ليدر"
         android:name="${applicationName}"

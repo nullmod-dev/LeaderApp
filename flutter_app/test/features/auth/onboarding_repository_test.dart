@@ -3,6 +3,7 @@ import 'package:mtm/core/access/capability.dart';
 import 'package:mtm/core/access/saas_tenant_status.dart';
 import 'package:mtm/core/result/result.dart';
 import 'package:mtm/core/storage/secure_store.dart';
+import 'package:mtm/features/auth/data/dev_test_credentials.dart';
 import 'package:mtm/features/auth/data/mock_onboarding_repository.dart';
 import 'package:mtm/features/auth/data/secure_auth_state_store.dart';
 import 'package:mtm/features/auth/domain/auth_models.dart';
@@ -66,19 +67,47 @@ void main() {
           'authentication_expired');
     });
 
-    test('an already-registered address gets the identical answer', () async {
+    test('an already-registered address gets a sign-in code; the typed '
+        'password is dropped', () async {
+      final existing = await signUp(OnboardingFixtures.verifiedUnlinkedEmail,
+          password: 'a-replacement-pass');
+      expect(existing.purpose, VerificationPurpose.signIn);
+      // The code signs the owner in — no dead end, no second account.
+      final s = await verified(existing);
+      expect(s.accountId, 'acc_unlinked');
+      await repo.abandon();
+      expect(
+          problem(await repo.signInWithPassword(
+              email: OnboardingFixtures.verifiedUnlinkedEmail,
+              password: 'a-replacement-pass')),
+          OnboardingProblemCode.invalidCredentials);
+      ok(await repo.signInWithPassword(
+          email: OnboardingFixtures.verifiedUnlinkedEmail,
+          password: kMockFixturePassword));
+    });
+
+    test('a development persona signs in by the code; the Super Admin gets '
+        'a decoy', () async {
+      final main = await signUp(DevTestCredentials.mainAdmin.email);
+      expect(main.purpose, VerificationPurpose.signIn);
+      expect(
+          ok(await repo.verifyEmail(
+              challenge: main,
+              code: kMockVerificationCode,
+              idempotencyKey: key())),
+          isA<EntryReady>());
+
       final fresh = await signUp('someone.new@example.org');
-      final existing = await signUp(OnboardingFixtures.verifiedUnlinkedEmail);
-      // Same shape, same fields, same cooldown — nothing distinguishes them.
-      expect(existing.toJson().keys, fresh.toJson().keys);
-      expect(existing.resendAvailableAt, fresh.resendAvailableAt);
-      expect(existing.attemptsRemaining, fresh.attemptsRemaining);
-      // …and the decoy can never be satisfied, even with the right code.
-      final r = await repo.verifyEmail(
-          challenge: existing,
-          code: kMockVerificationCode,
-          idempotencyKey: key());
-      expect(problem(r), OnboardingProblemCode.verificationCodeInvalid);
+      final superAdmin = await signUp(DevTestCredentials.superAdmin.email);
+      // Shaped like a fresh sign-up's answer, and never satisfied.
+      expect(superAdmin.toJson().keys, fresh.toJson().keys);
+      expect(superAdmin.purpose, VerificationPurpose.emailOwnership);
+      expect(
+          problem(await repo.verifyEmail(
+              challenge: superAdmin,
+              code: kMockVerificationCode,
+              idempotencyKey: key())),
+          OnboardingProblemCode.verificationCodeInvalid);
     });
 
     test('an unverified credential is replaced, never trusted', () async {
@@ -266,18 +295,73 @@ void main() {
       expect(r, isA<EntryVerificationRequired>());
     });
 
-    test('a returning Google account signs straight in', () async {
+    Future<OnboardingSnapshot> enter(AuthEntryOutcome outcome) async {
+      final challenge = (outcome as EntryVerificationRequired).challenge;
+      expect(challenge.purpose, VerificationPurpose.signIn);
+      return verified(challenge);
+    }
+
+    test('a returning Google account proves its mailbox with a code first',
+        () async {
       final r = ok(await google(
           '$kMockGoogleVerifiedPrefix${OnboardingFixtures.googleOnlyEmail}'));
-      expect(
-          (r as EntryContinueOnboarding).snapshot.accountId, 'acc_google_only');
+      expect(r, isA<EntryVerificationRequired>());
+      expect(repo.restrictedSessionToken, isNull, reason: 'no session yet');
+      expect((await enter(r)).accountId, 'acc_google_only');
     });
 
-    test('a verified password account is never merged automatically', () async {
-      final r = await google(
-          '$kMockGoogleVerifiedPrefix${OnboardingFixtures.readyEmail}');
-      expect(problem(r), OnboardingProblemCode.authMethodLinkRequired);
+    test('a verified password account gains Google only by the right code',
+        () async {
+      const token =
+          '$kMockGoogleVerifiedPrefix${OnboardingFixtures.verifiedUnlinkedEmail}';
+      // Walking away from the code links nothing.
+      ok(await google(token));
+      await repo.abandon();
+      final before = ok(await repo.signInWithPassword(
+          email: OnboardingFixtures.verifiedUnlinkedEmail,
+          password: kMockFixturePassword)) as EntryContinueOnboarding;
+      expect(before.snapshot.methods, {AuthMethod.password});
+      await repo.abandon();
+
+      final linked = await enter(ok(await google(token)));
+      expect(linked.methods, {AuthMethod.password, AuthMethod.google},
+          reason: 'linked, and the password is kept');
       expect(repo.fullSessionsIssued, 0);
+    });
+
+    test('a finished password account signs in by Google after its code',
+        () async {
+      final r = ok(await google(
+          '$kMockGoogleVerifiedPrefix${OnboardingFixtures.readyEmail}'));
+      final challenge = (r as EntryVerificationRequired).challenge;
+      expect(
+          ok(await repo.verifyEmail(
+              challenge: challenge,
+              code: kMockVerificationCode,
+              idempotencyKey: key())),
+          isA<EntryReady>());
+      expect(repo.fullSessionsIssued, 1);
+    });
+
+    test('a development persona is a returning account too', () async {
+      for (final persona in [
+        DevTestCredentials.mainAdmin,
+        DevTestCredentials.superAdmin,
+      ]) {
+        final r =
+            ok(await google('$kMockGoogleVerifiedPrefix${persona.email}'));
+        final challenge = (r as EntryVerificationRequired).challenge;
+        expect(challenge.purpose, VerificationPurpose.signIn);
+        expect(
+            ok(await repo.verifyEmail(
+                challenge: challenge,
+                code: kMockVerificationCode,
+                idempotencyKey: key())),
+            isA<EntryReady>(),
+            reason: persona.email);
+      }
+      expect(repo.accountIdFor(DevTestCredentials.mainAdmin.email), isNull,
+          reason: 'no second account is made for a persona address');
     });
 
     test('an unverified password account yields to the verified Google claim',
@@ -513,6 +597,38 @@ void main() {
     });
   });
 
+  group('a Main Admin seat is named before the Team Code', () {
+    test('the seat invitee reads its team; the link replaces it', () async {
+      final s = await verified(await signUp(OnboardingFixtures.nabdMainAdminEmail));
+      expect(s.link, TenantLinkStatus.unlinked);
+      expect(
+          s.pendingInvitation,
+          const PendingInvitation(
+              tenantDisplayName: 'فريق نبض التطوعي',
+              role: AuthRole.mainAdmin));
+      final linked = await link(OnboardingFixtures.nabdCode);
+      expect(linked.pendingInvitation, isNull);
+      expect(linked.tenant!.displayName, 'فريق نبض التطوعي');
+    });
+
+    test('a replacement designate reads the same', () async {
+      final s =
+          await verified(await signUp(OnboardingFixtures.najdDesignateEmail));
+      expect(s.pendingInvitation?.tenantDisplayName, 'فريق نجد للاستجابة');
+    });
+
+    test('nothing for an address without a seat, or a paused tenant',
+        () async {
+      expect((await verified(await signUp('no.seat@example.org')))
+          .pendingInvitation, isNull);
+      await repo.abandon();
+      repo.setTenantStatus(
+          OnboardingFixtures.nabdTenantId, SaasTenantStatus.suspended);
+      expect((await verified(await signUp(OnboardingFixtures.nabdMainAdminEmail)))
+          .pendingInvitation, isNull);
+    });
+  });
+
   group('Main Admin setup, against the Point 14 seat', () {
     late PlatformTenantStore store;
     late MockPlatformMainAdminRepository seats;
@@ -682,6 +798,126 @@ void main() {
       repo.completeSetupElsewhere(OnboardingFixtures.nabdMainAdminEmail);
       expect(problem(await repo.refresh()),
           OnboardingProblemCode.setupAlreadyCompleted);
+    });
+  });
+
+  group('email-first entry — status, and a sign-in by code alone', () {
+    Future<EmailEntryStatus> status(String email) async =>
+        ok(await repo.checkEmailStatus(email));
+
+    Future<VerificationChallenge> code(String email) async =>
+        ok(await repo.requestSignInCode(email));
+
+    Future<Result<AuthEntryOutcome>> enter(VerificationChallenge c) =>
+        repo.verifyEmail(
+            challenge: c, code: kMockVerificationCode, idempotencyKey: key());
+
+    test('says registered, invited or new — and nothing more', () async {
+      expect(await status(OnboardingFixtures.verifiedUnlinkedEmail),
+          EmailEntryStatus.registered);
+      expect(await status(OnboardingFixtures.readyEmail),
+          EmailEntryStatus.registered);
+      // A pending Simple Admin invitation, and an unclaimed seat account.
+      expect(await status(OnboardingFixtures.hilalInviteeEmail),
+          EmailEntryStatus.invited);
+      expect(await status(OnboardingFixtures.nabdMainAdminEmail),
+          EmailEntryStatus.invited);
+      // An unverified sign-up, an expired invitation, and nobody at all.
+      expect(await status(OnboardingFixtures.unverifiedEmail),
+          EmailEntryStatus.fresh);
+      expect(await status(OnboardingFixtures.hilalExpiredInviteeEmail),
+          EmailEntryStatus.fresh);
+      expect(await status('Nobody@Example.org'), EmailEntryStatus.fresh);
+      expect(repo.fullSessionsIssued, 0);
+      expect(ok(await repo.restore()), const EntryNone(),
+          reason: 'a status check leaves nothing on the device');
+    });
+
+    test('a registered address gets a real sign-in code that opens its step',
+        () async {
+      final unlinked = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      expect(unlinked.purpose, VerificationPurpose.signIn);
+      expect(unlinked.toJson()['purpose'], 'sign_in');
+      expect(ok(await enter(unlinked)), isA<EntryContinueOnboarding>());
+
+      await repo.abandon();
+      final ready = await code(OnboardingFixtures.readyEmail);
+      expect(ok(await enter(ready)), isA<EntryReady>());
+      expect(repo.fullSessionsIssued, 1);
+    });
+
+    test('any other address gets the same shape, which never verifies',
+        () async {
+      final real = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      final decoy = await code('nobody@example.org');
+      expect(decoy.toJson().keys, real.toJson().keys);
+      expect(decoy.purpose, VerificationPurpose.signIn);
+      expect(decoy.resendAvailableAt, real.resendAvailableAt);
+      expect(problem(await enter(decoy)),
+          OnboardingProblemCode.verificationCodeInvalid);
+      expect(repo.accountIdFor('nobody@example.org'), isNull);
+    });
+
+    test('a repeat inside the cooldown answers the same challenge', () async {
+      final first = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      final again = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      expect(again.handle, first.handle);
+      now = now.add(kMockResendCooldown);
+      final later = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      expect(later.handle, isNot(first.handle));
+      // The newer code replaced the older one.
+      expect(problem(await enter(first)),
+          OnboardingProblemCode.verificationChallengeEnded);
+    });
+
+    test('the code survives a restart and keeps its sign-in wording', () async {
+      final c = await code(OnboardingFixtures.verifiedUnlinkedEmail);
+      final restored = ok(await repo.restore());
+      expect(restored, isA<EntryVerificationPending>());
+      final held = (restored as EntryVerificationPending).challenge;
+      expect(held.handle, c.handle);
+      expect(held.purpose, VerificationPurpose.signIn);
+    });
+
+    test('a development persona signs in by code; the Super Admin never does',
+        () async {
+      final mainAdmin = DevTestCredentials.mainAdmin.email;
+      expect(await status(mainAdmin), EmailEntryStatus.registered);
+      expect(ok(await enter(await code(mainAdmin))), isA<EntryReady>());
+      expect(repo.fullSessionsIssued, 1);
+
+      final superAdmin = DevTestCredentials.superAdmin.email;
+      expect(await status(superAdmin), EmailEntryStatus.registered);
+      expect(problem(await enter(await code(superAdmin))),
+          OnboardingProblemCode.verificationCodeInvalid);
+      expect(repo.fullSessionsIssued, 1);
+    });
+
+    test('both calls draw on one budget, and every request counts', () async {
+      for (var i = 0; i < kMockEmailEntryBudget; i++) {
+        final r = i.isEven
+            ? await repo.checkEmailStatus('probe$i@example.org')
+            : await repo.requestSignInCode('probe$i@example.org');
+        expect(r, isA<Success<Object?>>(), reason: 'request $i');
+      }
+      final refused = await repo.checkEmailStatus('one.more@example.org');
+      expect(problem(refused), OnboardingProblemCode.rateLimited);
+      expect((refused as OnboardingFailure).retryAvailableAt,
+          now.add(kMockEmailEntryWindow));
+      expect(problem(await repo.requestSignInCode('x@example.org')),
+          OnboardingProblemCode.rateLimited);
+      now = now.add(kMockEmailEntryWindow);
+      expect(await status('one.more@example.org'), EmailEntryStatus.fresh);
+    });
+
+    test('offline asks nothing', () async {
+      final calls = repo.serverCalls;
+      online = false;
+      expect(await repo.checkEmailStatus(OnboardingFixtures.readyEmail),
+          isA<Offline<EmailEntryStatus>>());
+      expect(await repo.requestSignInCode(OnboardingFixtures.readyEmail),
+          isA<Offline<VerificationChallenge>>());
+      expect(repo.serverCalls, calls);
     });
   });
 

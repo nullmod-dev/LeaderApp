@@ -407,6 +407,47 @@ void main() {
       expect(container.read(authEntryStateProvider), isA<EntryOnboarding>());
     });
 
+    testWidgets('a Main Admin seat is named on the choice and on the code form',
+        (tester) async {
+      final (_, router) = await boot(tester);
+      await signUpAndVerify(tester, router, OnboardingFixtures.nabdMainAdminEmail);
+      final notice = find.byKey(const Key('team-link-pending-invitation'));
+
+      expect(at(router), '/link-team');
+      expect(notice, findsOneWidget);
+      expect(find.textContaining('فريق نبض التطوعي'), findsOneWidget);
+      expect(find.textContaining(S.teamLinkPendingInvitationPrefix),
+          findsOneWidget);
+      // The Simple Admin "no code needed" re-check would contradict it.
+      expect(find.text(S.teamLinkInvitationHint), findsNothing);
+      expect(find.byKey(const Key('check-invitation')), findsNothing);
+
+      await tapVisible(tester, choiceTeam);
+      expect(teamCode, findsOneWidget);
+      expect(notice, findsOneWidget);
+      expect(find.text(S.teamLinkInvitationHint), findsNothing);
+    });
+
+    testWidgets('an address with no seat is told nothing of the kind',
+        (tester) async {
+      final (_, router) = await boot(tester);
+      await signUpAndVerify(tester, router, newEmail);
+      expect(find.byKey(const Key('team-link-pending-invitation')),
+          findsNothing);
+      expect(find.text(S.teamLinkInvitationHint), findsOneWidget);
+    });
+
+    testWidgets('the seat notice fits 320dp at 1.6× text', (tester) async {
+      final (_, router) = await boot(tester,
+          width: 320, height: 1800, textScale: 1.6, mode: ThemeMode.dark);
+      await signUpAndVerify(tester, router, OnboardingFixtures.nabdMainAdminEmail);
+      final notice = find.byKey(const Key('team-link-pending-invitation'));
+      expect(tester.getRect(notice).right, lessThanOrEqualTo(320));
+      expect(tester.takeException(), isNull);
+      await tapVisible(tester, choiceTeam);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the choice fits 320dp at 1.6× text with a long address',
         (tester) async {
       final (_, router) = await boot(tester,

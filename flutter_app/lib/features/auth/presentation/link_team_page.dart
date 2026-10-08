@@ -46,6 +46,12 @@ import 'onboarding_ui.dart';
 /// `email_verified` verdict for Google (no second code). A `withdrawn`
 /// account already chose a team, so it opens on the Team Code form.
 ///
+/// **A Main Admin seat waiting for this address** is named on both states
+/// (`OnboardingSnapshot.pendingInvitation`): the team and the instruction to
+/// enter its Team Code. The Simple Admin "no code needed" re-check is then
+/// left out — the backend has said which invitation this is, and it is the
+/// one that does need the code.
+///
 /// Choosing the demo never links, never spends a Team Code and never creates
 /// a tenant relationship: it starts the same isolated demo session `/login`
 /// starts and discards this device's restricted onboarding session
@@ -172,6 +178,10 @@ class _LinkTeamPageState extends ConsumerState<LinkTeamPage> {
             const OnboardingErrorBanner(message: S.teamLinkWithdrawnNotice),
             const SizedBox(height: AppSpacing.md),
           ],
+          if (snapshot.pendingInvitation case final invitation?) ...[
+            _PendingInvitationNotice(invitation),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           Directionality(
             textDirection: TextDirection.ltr,
             child: TextField(
@@ -216,8 +226,10 @@ class _LinkTeamPageState extends ConsumerState<LinkTeamPage> {
               child: const Text(S.onboardingChoiceBack),
             ),
           ],
-          const SizedBox(height: AppSpacing.xl),
-          ..._invitationCheck(c),
+          if (snapshot.pendingInvitation == null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            ..._invitationCheck(c),
+          ],
           const SizedBox(height: AppSpacing.xl),
           const OnboardingExitRow(),
         ],
@@ -239,6 +251,10 @@ class _LinkTeamPageState extends ConsumerState<LinkTeamPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (snapshot.pendingInvitation case final invitation?) ...[
+            _PendingInvitationNotice(invitation),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           Text(
             S.onboardingChoiceLead,
             style: TextStyle(color: c.ink2, fontSize: 14, height: 1.6),
@@ -279,8 +295,10 @@ class _LinkTeamPageState extends ConsumerState<LinkTeamPage> {
             const SizedBox(height: AppSpacing.md),
             OnboardingErrorBanner(message: _error!),
           ],
-          const SizedBox(height: AppSpacing.xl),
-          ..._invitationCheck(c, disabled: startingDemo),
+          if (snapshot.pendingInvitation == null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            ..._invitationCheck(c, disabled: startingDemo),
+          ],
           const SizedBox(height: AppSpacing.xl),
           const OnboardingExitRow(),
         ],
@@ -312,6 +330,47 @@ class _LinkTeamPageState extends ConsumerState<LinkTeamPage> {
           ),
         ],
       ];
+}
+
+/// «لديك دعوة لإدارة «X» — أدخل رمز الفريق…» — good news, so the primary
+/// tint rather than a banner's alarm, and a live region so a screen reader
+/// hears it with the screen. The team's name is isolated (FSI…PDI): a Latin
+/// name keeps its own order inside the Arabic sentence.
+class _PendingInvitationNotice extends StatelessWidget {
+  const _PendingInvitationNotice(this.invitation);
+
+  final PendingInvitation invitation;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('team-link-pending-invitation'),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: c.primaryTint,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.mark_email_unread_outlined, color: c.primary, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${S.teamLinkPendingInvitationPrefix}'
+                '\u2068${invitation.tenantDisplayName}\u2069'
+                '${S.teamLinkPendingInvitationSuffix}',
+                style: TextStyle(color: c.ink, fontSize: 13.5, height: 1.55),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// One option on the Point 18B chooser: a full-width, ≥48dp tappable card

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/env/build_mode.dart';
@@ -10,6 +12,7 @@ import '../domain/auth_models.dart';
 import '../domain/auth_repository.dart';
 import '../domain/demo_session_store.dart';
 import '../domain/session_access.dart';
+import 'http_auth_repository.dart';
 import 'mock_auth_repository.dart';
 import 'persistent_demo_session_store.dart';
 import 'secure_auth_state_store.dart';
@@ -96,9 +99,24 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 /// Invalidate **this** one to force a re-read of the session — invalidating
 /// the derived provider alone re-awaits this cached future and gets the same
 /// answer back.
+///
+/// The seven-day offline window also ends inside a running session: when the
+/// HTTP repository holds an offline copy, this reads itself again the moment
+/// that copy expires. Online, the server's answer decides; offline, the read
+/// answers `offline_session_expired`. The previous value stays visible while
+/// it reloads, so nothing flickers.
 final currentUserResultProvider =
     FutureProvider<Result<AuthUser?>>((ref) async {
-  return ref.read(authRepositoryProvider).currentUser();
+  final repository = ref.read(authRepositoryProvider);
+  final result = await repository.currentUser();
+  if (repository is HttpAuthRepository) {
+    final left = repository.untilOfflineExpiry;
+    if (left != null) {
+      final timer = Timer(left, ref.invalidateSelf);
+      ref.onDispose(timer.cancel);
+    }
+  }
+  return result;
 });
 
 /// The signed-in account, or `null`.
@@ -182,6 +200,12 @@ enum AuthGate {
   /// Distinct from [signedOut] because it lands on its own screen.
   expired,
 
+  /// The server could not be reached and the offline copy of this session is
+  /// past its seven days. Not a sign-out: the tokens are kept, so the next
+  /// online read may still succeed. Its own screen says "connect", not
+  /// "sign in".
+  offlineExpired,
+
   /// An account arrived and this client refuses it: [AuthUser.isWellFormed]
   /// failed, so the role and the tenant id disagree.
   ///
@@ -217,8 +241,9 @@ final authGateProvider = Provider<AuthGate>((ref) {
       final u when !u.isWellFormed => AuthGate.invalid,
       _ => AuthGate.signedIn,
     },
-    failure: (_, code) =>
-        ProblemCode.parse(code) == ProblemCode.authenticationExpired
+    failure: (_, code) => code == HttpAuthRepository.offlineExpiredCode
+        ? AuthGate.offlineExpired
+        : ProblemCode.parse(code) == ProblemCode.authenticationExpired
             ? AuthGate.expired
             : AuthGate.unknown,
     // A cached account is still an account: offline-first means the app keeps
@@ -250,9 +275,12 @@ final sessionAccessProvider = Provider<SessionAccess>((ref) {
   // the same startup classifier a production response uses.
   ref.watch(currentUserResultProvider);
   final repository = ref.watch(authRepositoryProvider);
-  final access = repository is MockAuthRepository
-      ? repository.currentSessionAccess
-      : SessionAccess.normal;
+  final access = switch (repository) {
+    final MockAuthRepository mock => mock.currentSessionAccess,
+    // The backend's envelope, cached from the same `GET /auth/me` read.
+    final HttpAuthRepository http => http.currentSessionAccess,
+    _ => SessionAccess.normal,
+  };
   // The demo **window** is control-plane state, not session state: a trial
   // ends because its 24 hours ran out or because a Super Admin ended it, and
   // neither of those is something the session that started it can know. In

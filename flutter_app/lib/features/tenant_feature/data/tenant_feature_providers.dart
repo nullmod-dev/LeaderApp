@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_config.dart';
 import '../../../core/result/result.dart';
 import '../../auth/data/auth_providers.dart';
 import '../../platform/data/saas_tenant_providers.dart';
 import '../domain/tenant_feature_models.dart';
 import '../domain/tenant_feature_repository.dart';
+import 'http_tenant_features_reader.dart';
 import 'mock_tenant_feature_repository.dart';
 
 final tenantFeatureRepositoryProvider =
@@ -85,7 +87,11 @@ final currentTenantFeatureAccessProvider = Provider<TenantFeatureAccess>((ref) {
   if (tenantId == null || tenantId.isEmpty) {
     return const TenantFeatureAccess.unavailable();
   }
-  final set = ref.watch(platformTenantStoreProvider).featuresOf(tenantId);
+  // A backend build reads the server's answer (`GET /tenant/features`);
+  // the mock build keeps reading the fixture store.
+  final set = isBackendConfigured
+      ? ref.watch(remoteTenantFeaturesProvider).valueOrNull
+      : ref.watch(platformTenantStoreProvider).featuresOf(tenantId);
   return set == null
       ? const TenantFeatureAccess.unavailable()
       : TenantFeatureAccess.tenant(set);
@@ -105,7 +111,9 @@ final currentTenantFeatureAccessFutureProvider =
   if (tenantId == null || tenantId.isEmpty) {
     return const TenantFeatureAccess.unavailable();
   }
-  final set = ref.read(platformTenantStoreProvider).featuresOf(tenantId);
+  final set = isBackendConfigured
+      ? await ref.watch(remoteTenantFeaturesProvider.future)
+      : ref.read(platformTenantStoreProvider).featuresOf(tenantId);
   return set == null
       ? const TenantFeatureAccess.unavailable()
       : TenantFeatureAccess.tenant(set);
