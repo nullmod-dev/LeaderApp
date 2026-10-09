@@ -13,7 +13,7 @@ import 'package:mtm/l10n/strings.dart';
 void main() {
   group('the approved contacts', () {
     test('the support address is exactly the approved one', () {
-      expect(supportEmail, 'medical.team.auth@gmail.com');
+      expect(supportEmail, 'mtm.auth.teams@gmail.com');
     });
 
     test('the Telegram username is exactly the approved one, with its @', () {

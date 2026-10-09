@@ -43,13 +43,7 @@ class HttpTenantLifecycleRepository implements TenantLifecycleRepository {
           j['lifecycle'] as Map<String, dynamic>),
       changed: (j['changed'] as bool?) ?? true,
       tombstone: tombstone is Map<String, dynamic>
-          ? DeletedTenantTombstone(
-              tenantId: tombstone['tenantId'] as String,
-              displayNameSnapshot: tombstone['displayNameSnapshot'] as String,
-              deletedAt: DateTime.parse(tombstone['deletedAt'] as String),
-              lifecycleVersion: (tombstone['lifecycleVersion'] as num).toInt(),
-              historyReference: tombstone['historyReference'] as String,
-            )
+          ? DeletedTenantTombstone.fromJson(tombstone)
           : null,
     );
     return replayed ? result.asIdempotentReplay() : result;

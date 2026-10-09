@@ -11,9 +11,12 @@ import '../../../core/widgets/confirmation_dialog.dart';
 import '../../../l10n/strings.dart';
 import '../../settings/presentation/widgets/settings_widgets.dart';
 import '../../shell/main_shell.dart';
+import '../../detachment/data/detachment_providers.dart';
+import '../../detachment/domain/detachment_models.dart';
 import '../../tenant_feature/data/tenant_feature_providers.dart';
 import '../data/simple_admin_providers.dart';
 import '../domain/simple_admin_models.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 class SimpleAdminManagementPage extends ConsumerWidget {
   const SimpleAdminManagementPage({super.key});
@@ -202,7 +205,7 @@ class _InvitationRow extends ConsumerWidget {
       failure: (_, __) => ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(S.simpleAdminActionFailed))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -234,6 +237,10 @@ class _SimpleAdminInvitePageState extends ConsumerState<SimpleAdminInvitePage> {
   final _email = TextEditingController();
   final _name = TextEditingController();
   final _selected = <String>{...simpleAdminAssignableKeys};
+
+  /// Detachment-level keys limited to [_detachments]; team-wide when false.
+  bool _limited = false;
+  final _detachments = <String>{};
   bool _validated = false;
 
   @override
@@ -314,6 +321,17 @@ class _SimpleAdminInvitePageState extends ConsumerState<SimpleAdminInvitePage> {
                 child: Text(S.simpleAdminCapabilityRequired,
                     style: TextStyle(color: context.c.crit)),
               ),
+            DetachmentScopeSelector(
+              limited: _limited,
+              selected: _detachments,
+              enabled: !submitting,
+              showError: _validated,
+              onLimitedChanged: (limited) =>
+                  setState(() => _limited = limited),
+              onToggle: (id, selected) => setState(() {
+                selected ? _detachments.add(id) : _detachments.remove(id);
+              }),
+            ),
             const SizedBox(height: AppSpacing.xl),
             FilledButton.icon(
               key: const Key('simple-admin-send-invitation'),
@@ -342,7 +360,8 @@ class _SimpleAdminInvitePageState extends ConsumerState<SimpleAdminInvitePage> {
     final selected = _selected.intersection(allowed);
     if (_name.text.trim().isEmpty ||
         !_validEmail(_email.text) ||
-        selected.isEmpty) {
+        selected.isEmpty ||
+        (_limited && _detachments.isEmpty)) {
       return;
     }
     final result =
@@ -351,6 +370,7 @@ class _SimpleAdminInvitePageState extends ConsumerState<SimpleAdminInvitePage> {
                 email: _email.text,
                 suggestedName: _name.text,
                 capabilityKeys: selected,
+                detachmentIds: _limited ? {..._detachments} : const {},
                 expectedRevision: snapshot.revision,
                 idempotencyKey: ref.read(newOperationIdProvider)(),
               ),
@@ -367,7 +387,7 @@ class _SimpleAdminInvitePageState extends ConsumerState<SimpleAdminInvitePage> {
               ? S.simpleAdminDuplicateInvitation
               : S.simpleAdminActionFailed))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -388,6 +408,9 @@ class SimpleAdminCapabilitiesPage extends ConsumerStatefulWidget {
 class _SimpleAdminCapabilitiesPageState
     extends ConsumerState<SimpleAdminCapabilitiesPage> {
   Set<String>? _selected;
+  late bool _limited;
+  late Set<String> _detachments;
+  bool _validated = false;
 
   @override
   Widget build(BuildContext context) {
@@ -402,7 +425,14 @@ class _SimpleAdminCapabilitiesPageState
           appBar: AppBar(title: const Text(S.simpleAdminEditCapabilities)),
           body: const Center(child: CircularProgressIndicator()));
     }
-    _selected ??= {...account.capabilities.global};
+    if (_selected == null) {
+      // Every key the account holds anywhere — a scoped grant used to open
+      // here as nothing selected, and saving it made it team-wide.
+      final form = simpleAdminFormOf(account.capabilities);
+      _selected = form.keys;
+      _detachments = form.detachmentIds;
+      _limited = form.detachmentIds.isNotEmpty;
+    }
     return Scaffold(
       backgroundColor: context.c.bg,
       appBar: AppBar(title: const Text(S.simpleAdminEditCapabilities)),
@@ -427,6 +457,17 @@ class _SimpleAdminCapabilitiesPageState
                 selected ? _selected!.add(key) : _selected!.remove(key);
               }),
             ),
+            DetachmentScopeSelector(
+              limited: _limited,
+              selected: _detachments,
+              enabled: !submitting,
+              showError: _validated,
+              onLimitedChanged: (limited) =>
+                  setState(() => _limited = limited),
+              onToggle: (id, selected) => setState(() {
+                selected ? _detachments.add(id) : _detachments.remove(id);
+              }),
+            ),
             const SizedBox(height: AppSpacing.xl),
             FilledButton(
               key: const Key('simple-admin-save-capabilities'),
@@ -443,12 +484,15 @@ class _SimpleAdminCapabilitiesPageState
 
   Future<void> _save(SimpleAdminManagementSnapshot snapshot,
       SimpleAdminAccount account) async {
+    setState(() => _validated = true);
+    if (_limited && _detachments.isEmpty) return;
     final result = await ref
         .read(simpleAdminActionControllerProvider.notifier)
         .updateCapabilities(
           UpdateSimpleAdminCapabilitiesCommand(
               accountId: account.id,
               capabilityKeys: _selected!,
+              detachmentIds: _limited ? {..._detachments} : const {},
               expectedRevision: snapshot.revision),
         );
     if (result == null || !mounted) return;
@@ -457,7 +501,7 @@ class _SimpleAdminCapabilitiesPageState
       failure: (_, __) => ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(S.simpleAdminActionFailed))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }
@@ -531,6 +575,138 @@ class CapabilitySelector extends StatelessWidget {
         SimpleAdminCapabilityGroup.workshops => S.simpleAdminGroupWorkshops,
         SimpleAdminCapabilityGroup.insights => S.simpleAdminGroupInsights,
       };
+}
+
+/// Where the detachment-level keys apply: every detachment, or the ones
+/// chosen here. The server builds the grant from this (`detachmentIds`);
+/// workshop keys stay team-wide whatever is chosen, and the lead says so.
+class DetachmentScopeSelector extends ConsumerWidget {
+  const DetachmentScopeSelector({
+    super.key,
+    required this.limited,
+    required this.selected,
+    required this.enabled,
+    required this.showError,
+    required this.onLimitedChanged,
+    required this.onToggle,
+  });
+
+  final bool limited;
+  final Set<String> selected;
+  final bool enabled;
+
+  /// The form was submitted: an empty choice under "chosen" is said.
+  final bool showError;
+  final ValueChanged<bool> onLimitedChanged;
+  final void Function(String detachmentId, bool selected) onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    return Column(
+      key: const Key('simple-admin-scope'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionLabel(S.simpleAdminScope),
+        Text(S.simpleAdminScopeLead,
+            style: TextStyle(color: c.ink3, fontSize: 12, height: 1.5)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          children: [
+            ChoiceChip(
+              key: const Key('simple-admin-scope-all'),
+              label: const Text(S.simpleAdminScopeAll),
+              selected: !limited,
+              onSelected: enabled ? (_) => onLimitedChanged(false) : null,
+            ),
+            ChoiceChip(
+              key: const Key('simple-admin-scope-some'),
+              label: const Text(S.simpleAdminScopeSome),
+              selected: limited,
+              onSelected: enabled ? (_) => onLimitedChanged(true) : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          limited ? S.simpleAdminScopeSomeSub : S.simpleAdminScopeAllSub,
+          style: TextStyle(color: c.ink3, fontSize: 12, height: 1.5),
+        ),
+        if (limited) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _DetachmentChoices(
+            selected: selected,
+            enabled: enabled,
+            onToggle: onToggle,
+          ),
+          if (showError && selected.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                S.simpleAdminScopeRequired,
+                key: const Key('simple-admin-scope-required'),
+                style: TextStyle(color: c.crit),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The team's detachments as a checklist, with its own loading, empty and
+/// failure lines — the rest of the form stays usable whichever it is.
+class _DetachmentChoices extends ConsumerWidget {
+  const _DetachmentChoices({
+    required this.selected,
+    required this.enabled,
+    required this.onToggle,
+  });
+
+  final Set<String> selected;
+  final bool enabled;
+  final void Function(String detachmentId, bool selected) onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final async = ref.watch(detachmentListProvider(const DetachmentListQuery()));
+    final List<Detachment>? items = switch (async.valueOrNull) {
+      Success(:final data) => data,
+      Offline(:final cached) => cached,
+      _ => null,
+    };
+    if (items == null) {
+      if (async.isLoading) {
+        return const Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      return Text(S.simpleAdminScopeLoadFailed,
+          style: TextStyle(color: c.ink3, height: 1.5));
+    }
+    if (items.isEmpty) {
+      return Text(S.simpleAdminScopeEmpty,
+          style: TextStyle(color: c.ink3, height: 1.5));
+    }
+    return SettingsSection(children: [
+      for (final detachment in items)
+        CheckboxListTile(
+          key: Key('scope-detachment-${detachment.id}'),
+          value: selected.contains(detachment.id),
+          onChanged: enabled
+              ? (value) => onToggle(detachment.id, value ?? false)
+              : null,
+          title: Text(detachment.name),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.sm, 0, AppSpacing.md, 0),
+        ),
+    ]);
+  }
 }
 
 List<SimpleAdminCapabilityDefinition> _availableDefinitions(WidgetRef ref) {

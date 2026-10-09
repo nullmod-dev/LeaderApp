@@ -43,7 +43,7 @@ void main() {
       ]);
       await scope.read(currentUserProvider.future);
       expect(scope.read(platformCommerceActorProvider) != null, allowed);
-      final result = scope.read(platformCommerceActionsProvider).createOffer(
+      final result = await scope.read(platformCommerceActionsProvider).createOffer(
             target: BillingOptionId.monthly,
             discount: const PercentageDiscount(10),
             enabled: false,

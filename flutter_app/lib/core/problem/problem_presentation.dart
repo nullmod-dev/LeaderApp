@@ -130,6 +130,11 @@ ProblemView resolveProblem(Problem problem) {
           problem, S.errPlanLimitTitle, S.errPlanLimit, ProblemSurface.inline,
           retryable: false);
 
+    case ProblemCode.sessionRestricted:
+      return _view(problem, S.errSessionRestrictedTitle, S.errSessionRestricted,
+          ProblemSurface.inline,
+          retryable: false);
+
     case ProblemCode.notFound:
       return _view(problem, S.errTitle, S.errNotFound, ProblemSurface.inline,
           retryable: false);

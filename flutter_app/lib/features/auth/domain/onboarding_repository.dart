@@ -106,6 +106,17 @@ enum OnboardingProblemCode {
   /// accompany it.
   rateLimited('rate_limited'),
 
+  /// A trusted device of this account answered "No" to this phone: it can
+  /// never sign in to the account again.
+  deviceBlocked('device_blocked'),
+
+  /// A trusted device answered "No" to a new device, so the password is
+  /// known to someone else: reset it before signing in with it.
+  passwordResetRequired('password_reset_required'),
+
+  /// This build sent no device id; only an update can fix that.
+  deviceIdRequired('device_id_required'),
+
   idempotencyConflict('idempotency_conflict');
 
   const OnboardingProblemCode(this.wire);
@@ -202,6 +213,9 @@ enum OnboardingErrorKind {
   accountUnavailable,
   sessionEnded,
   rateLimited,
+  deviceBlocked,
+  passwordResetRequired,
+  appUpdateRequired,
   offline,
   temporaryFailure,
   unknown;
@@ -263,6 +277,11 @@ OnboardingErrorKind? onboardingErrorKindOf(Result<Object?> result) {
       OnboardingProblemCode.onboardingRequired =>
         OnboardingErrorKind.sessionEnded,
       OnboardingProblemCode.rateLimited => OnboardingErrorKind.rateLimited,
+      OnboardingProblemCode.deviceBlocked => OnboardingErrorKind.deviceBlocked,
+      OnboardingProblemCode.passwordResetRequired =>
+        OnboardingErrorKind.passwordResetRequired,
+      OnboardingProblemCode.deviceIdRequired =>
+        OnboardingErrorKind.appUpdateRequired,
       // The same key with a different body is a client bug, not a user
       // situation; the generic sentence is the honest one.
       OnboardingProblemCode.idempotencyConflict => OnboardingErrorKind.unknown,

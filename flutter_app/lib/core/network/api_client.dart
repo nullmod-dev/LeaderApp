@@ -98,6 +98,11 @@ class ApiClient {
   /// were cleared and the person has to sign in again.
   void Function()? onSessionEnded;
 
+  /// This installation's id, sent as `X-Device-Id` on every request: every
+  /// sign-in needs it (device trust), and a session that predates device
+  /// trust registers its phone with it. `null` sends none.
+  Future<String> Function()? deviceId;
+
   Future<bool>? _refreshing;
 
   TokenVault get vault => _vault;
@@ -220,10 +225,12 @@ class ApiClient {
     bool notifyUpgrade = true,
     Map<String, String>? extraHeaders,
   }) async {
+    final installation = deviceId;
     final headers = <String, String>{
       ...?extraHeaders,
       'Accept': 'application/json',
       AppInfo.clientVersionHeader: AppInfo.version,
+      if (installation != null) 'X-Device-Id': await installation(),
     };
     if (bearer != null) {
       headers['Authorization'] = 'Bearer $bearer';

@@ -409,7 +409,7 @@ class _ShiftEditorState extends ConsumerState<_ShiftEditor> {
       return;
     }
     if (offline == true) {
-      setState(() => _error = S.offlineTitle);
+      setState(() => _error = S.actionNeedsConnection);
       return;
     }
     ref.invalidate(weekShiftsProvider);

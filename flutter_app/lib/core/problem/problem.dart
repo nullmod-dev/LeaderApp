@@ -38,6 +38,14 @@ enum ProblemCode {
   /// this, the organisation has no room for more of it.
   planLimitReached('plan_limit_reached'),
 
+  /// `HTTP 403`. Device trust: this session runs on a new or untrusted
+  /// device, which may create records and edit its own but not change older
+  /// data or the account until its window ends or a trusted device approves
+  /// it (`docs/api/auth.md` → Device trust). App-wide, and **not a
+  /// permission** — the same account may do it from a trusted device — so it
+  /// never shares copy with [notPermitted].
+  sessionRestricted('session_restricted'),
+
   /// `HTTP 404`.
   notFound('not_found'),
 

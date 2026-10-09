@@ -11,7 +11,7 @@ import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/made_in_iraq.dart';
 import '../../../core/widgets/reading_column.dart';
 import '../../../l10n/strings.dart';
-import '../data/auth_entry_email_provider.dart';
+import '../../about/presentation/support_handoff.dart';
 import '../data/auth_providers.dart';
 import '../data/google_identity_gateway.dart';
 import '../data/onboarding_controller.dart';
@@ -84,18 +84,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _offline = false;
   bool _obscure = true;
 
-  /// The email-code way in is running: a status check, then the code.
-  bool _codeBusy = false;
-
-  /// A refusal or an offline hold for the email-code way in, said under its
-  /// own button rather than above the password CTA it has nothing to do with.
-  ({String message, bool offline})? _codeNotice;
-
-  /// What the backend said the typed address is, when that changes what this
-  /// screen offers: no account yet, or an invitation. Shown only while the
-  /// field still holds that address.
-  ({String email, EmailEntryStatus status})? _entryAdvice;
-
   @override
   void initState() {
     super.initState();
@@ -151,7 +139,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  bool get _locked => _busy || _googleBusy || _codeBusy;
+  bool get _locked => _busy || _googleBusy;
 
   /// Whether the CTA can be pressed. Empty fields are the only thing this
   /// screen refuses on its own — everything else is the repository's answer
@@ -174,70 +162,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     await _enter(result);
-  }
-
-  /// The email-code way in. The address is checked first, so nobody is sent
-  /// to wait for a code that will never come: a registered address gets its
-  /// code and the code screen; any other gets the step that fits it.
-  Future<void> _requestCode() async {
-    if (_locked) return;
-    final email = _email.text;
-    final invalid = validateLoginEmail(email);
-    if (invalid != null) {
-      setState(() {
-        _entryAdvice = null;
-        _codeNotice = (
-          message: invalid == LoginEmailError.empty
-              ? S.emailCodeNeedsEmail
-              : S.mainAdminEmailInvalid,
-          offline: false,
-        );
-      });
-      _emailFocus.requestFocus();
-      return;
-    }
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _codeBusy = true;
-      _codeNotice = null;
-      _entryAdvice = null;
-    });
-    final controller = ref.read(onboardingControllerProvider.notifier);
-    final status = await controller.checkEmailStatus(email);
-    if (!mounted) return;
-    if (status case Success(data: EmailEntryStatus.registered)) {
-      final sent = await controller.beginEmailCodeSignIn(email);
-      if (!mounted) return;
-      setState(() => _codeBusy = false);
-      if (sent is Success) {
-        context.go('/verify-email');
-      } else {
-        setState(() => _codeNotice = _noticeFor(sent));
-      }
-      return;
-    }
-    setState(() {
-      _codeBusy = false;
-      if (status case Success(:final data)) {
-        _entryAdvice = (email: normalizeLoginEmail(email), status: data);
-      } else {
-        _codeNotice = _noticeFor(status);
-      }
-    });
-  }
-
-  static ({String message, bool offline}) _noticeFor(Result<Object?> result) =>
-      result is Offline
-          ? (message: S.onboardingOfflineNotice, offline: true)
-          : (
-              message: onboardingErrorMessage(onboardingErrorKindOf(result)!),
-              offline: false,
-            );
-
-  /// Carries the address to `/signup`, so it is never typed twice.
-  void _signUpWith(String email) {
-    ref.read(authEntryEmailProvider.notifier).state = email;
-    context.push('/signup');
   }
 
   Future<void> _onGoogleAttempt(GoogleSignInAttempt attempt) async {
@@ -350,6 +274,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         const SizedBox(height: 16),
                         _signupRow(glass),
+                        _supportRow(glass),
                         const Spacer(flex: 3),
                         MadeInIraqFooter(
                           color: glass.faint,
@@ -368,8 +293,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _form(EntryGlass glass, String? notice) {
-    final advice = _entryAdvice;
-    final codeNotice = _codeNotice;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -465,7 +388,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         _Divider(glass: glass),
         const SizedBox(height: 18),
         GoogleSignInButton(
-          busy: _busy || _codeBusy,
+          busy: _busy,
           loading: _googleBusy,
           onAttempt: _onGoogleAttempt,
           skin: GoogleButtonSkin(
@@ -479,31 +402,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             plate: const Color(0xFFFFFFFF),
           ),
         ),
-        const SizedBox(height: 12),
-        _EmailCodeButton(
-          glass: glass,
-          busy: _codeBusy,
-          onPressed: _locked ? null : _requestCode,
-        ),
-        if (codeNotice != null) ...[
-          const SizedBox(height: 12),
-          _Notice(
-            glass: glass,
-            icon: codeNotice.offline
-                ? Icons.wifi_off_rounded
-                : Icons.error_outline_rounded,
-            message: codeNotice.message,
-            tone: codeNotice.offline ? _NoticeTone.quiet : _NoticeTone.danger,
-          ),
-        ] else if (advice != null &&
-            advice.email == normalizeLoginEmail(_email.text)) ...[
-          const SizedBox(height: 12),
-          _EntryAdvice(
-            glass: glass,
-            invited: advice.status == EmailEntryStatus.invited,
-            onSignUp: _locked ? null : () => _signUpWith(advice.email),
-          ),
-        ],
       ],
     );
   }
@@ -530,6 +428,40 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      );
+
+  /// «تحتاج مساعدة؟ تواصل مع الدعم» — the way to a person for someone who
+  /// cannot get in: locked out, no code arriving, unsure which address their
+  /// team used. Under «إنشاء حساب» and quieter than it (ink, not accent), so
+  /// the screen's own ways in stay first. Opens the support sheet over this
+  /// screen; no route, so the form keeps what was typed.
+  Widget _supportRow(EntryGlass glass) => Wrap(
+        key: const Key('login-support'),
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            S.loginSupportPrompt,
+            style: TextStyle(color: glass.muted, fontSize: 13.5),
+          ),
+          TextButton.icon(
+            key: const Key('login-support-open'),
+            onPressed: _locked ? null : () => showSupportSheet(context),
+            style: TextButton.styleFrom(
+              foregroundColor: glass.fg,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(48, 44),
+            ),
+            icon: const Icon(Icons.support_agent_rounded, size: 18),
+            label: const Text(
+              S.contactSupport,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -843,189 +775,6 @@ class _PrimaryCta extends StatelessWidget {
                 ],
               )
             : const Text(S.signIn),
-      ),
-    );
-  }
-}
-
-/// «الدخول برمز يصل إلى بريدك» — the way in for an account with no
-/// password, or a forgotten one. It needs the address only.
-///
-/// **Google's sibling, not a second CTA.** The same well, border, radius and
-/// height as the Google surface above it, so the panel still has exactly one
-/// lit action and its alternatives sit quietly under the rule. The leading
-/// glyph becomes the progress ring while the address is checked and the code
-/// is asked for, as Google's mark does.
-class _EmailCodeButton extends StatelessWidget {
-  const _EmailCodeButton({
-    required this.glass,
-    required this.busy,
-    required this.onPressed,
-  });
-
-  final EntryGlass glass;
-  final bool busy;
-  final VoidCallback? onPressed;
-
-  /// The leading slot, mirrored after the label so it sits optically
-  /// centred in the full-width surface.
-  static const double _lead = 22;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = !busy && onPressed != null;
-    final label = busy ? S.emailCodeChecking : S.emailCodeSignIn;
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: label,
-      excludeSemantics: true,
-      child: Material(
-        color: glass.fieldFill,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: glass.fieldBorder, width: 1.5),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const Key('login-email-code'),
-          onTap: enabled ? onPressed : null,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 54),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              child: Row(
-                children: [
-                  SizedBox.square(
-                    dimension: _lead,
-                    child: busy
-                        ? Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: glass.accent,
-                            ),
-                          )
-                        : Icon(
-                            Icons.mark_email_read_outlined,
-                            size: 20,
-                            color: enabled ? glass.accent : glass.faint,
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: enabled || busy ? glass.fg : glass.faint,
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: _lead + 12),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// What the typed address turned out to be when it is not an account yet —
-/// nothing at all, or an invitation waiting for it — and the step that
-/// follows. Google, the other step, is the surface just above.
-///
-/// The quiet notice's wash and border, so it reads as guidance rather than a
-/// refusal; the invitation's glyph takes the accent because it is good news.
-/// A live region, so a screen reader hears the answer to the tap it made.
-class _EntryAdvice extends StatelessWidget {
-  const _EntryAdvice({
-    required this.glass,
-    required this.invited,
-    required this.onSignUp,
-  });
-
-  final EntryGlass glass;
-  final bool invited;
-  final VoidCallback? onSignUp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        key: const Key('login-email-advice'),
-        padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 12, 2),
-        decoration: BoxDecoration(
-          color: glass.fieldFill,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: glass.fieldBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Icon(
-                    invited
-                        ? Icons.mark_email_unread_outlined
-                        : Icons.person_add_alt_1_outlined,
-                    color: invited ? glass.accent : glass.muted,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    invited ? S.emailEntryInvited : S.emailEntryFresh,
-                    style: TextStyle(
-                      color: glass.muted,
-                      fontSize: 13,
-                      height: 1.55,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Indented to the text, past the glyph, so the action reads as
-            // this sentence's own.
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 20),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  key: const Key('login-email-advice-signup'),
-                  onPressed: onSignUp,
-                  style: TextButton.styleFrom(
-                    // Prose on the panel: `accentInk`, the value that clears
-                    // 4.5:1 as text. See [EntryGlass.accentInk].
-                    foregroundColor: glass.accentInk,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    minimumSize: const Size(48, 44),
-                    tapTargetSize: MaterialTapTargetSize.padded,
-                  ),
-                  child: const Text(
-                    S.createAccountWithEmail,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

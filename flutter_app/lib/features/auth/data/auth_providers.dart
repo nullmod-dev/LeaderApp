@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/env/build_mode.dart';
 import '../../../core/problem/problem.dart';
 import '../../../core/result/result.dart';
+import '../../../core/startup/launch_failure.dart';
 import '../../../core/storage/local_store.dart';
 import '../../../core/storage/secure_store.dart';
 import '../../demo/data/demo_control_plane.dart';
@@ -254,6 +255,25 @@ final authGateProvider = Provider<AuthGate>((ref) {
       _ => AuthGate.signedIn,
     },
   );
+});
+
+/// Why the session read failed, when nothing could be opened instead.
+///
+/// Only two failures are named, because only they get their own screen: the
+/// server could not be reached (`Offline` with no stored copy, or the
+/// client-synthesised `network` code), or it answered `5xx` (`server`). Every
+/// other answer is [LaunchFailure.none] — including a failure of this phone's
+/// own secure storage, which is neither the network nor the server.
+final launchFailureProvider = Provider<LaunchFailure>((ref) {
+  final result = ref.watch(currentUserResultProvider).valueOrNull;
+  return switch (result) {
+    Offline(cached: null) => LaunchFailure.network,
+    Failure(:final code) when code == ProblemCode.network.wire =>
+      LaunchFailure.network,
+    Failure(:final code) when code == ProblemCode.server.wire =>
+      LaunchFailure.server,
+    _ => LaunchFailure.none,
+  };
 });
 
 /// What the server says about this account's and this customer's lifecycle,

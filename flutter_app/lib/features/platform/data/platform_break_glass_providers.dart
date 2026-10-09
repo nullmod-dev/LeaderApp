@@ -61,6 +61,10 @@ final platformBreakGlassRepositoryProvider =
 
 final breakGlassCurrentProvider =
     FutureProvider<Result<BreakGlassSnapshot>>((ref) {
+  // A lifecycle change made in this app (suspending the target, say) is a
+  // reason to ask again: the server settles the grant against it, and the
+  // snapshot's vouch for the target team is only as fresh as the read.
+  ref.watch(tenantLifecycleRevisionProvider);
   return ref.watch(platformBreakGlassRepositoryProvider).loadCurrent();
 });
 
@@ -140,16 +144,18 @@ final breakGlassAccessProvider = Provider<BreakGlassAccessDecision>((ref) {
   final current = ref.watch(breakGlassCurrentProvider).valueOrNull;
   if (current == null) return BreakGlassAccessDecision.none;
 
-  final (grant, confirmed) = current.when(
-    success: (snapshot, {stale = false}) => (snapshot.grant, !stale),
-    failure: (_, __) => (null, false),
-    offline: (cached) => (cached?.grant, false),
+  final (grant, confirmed, vouched) = current.when(
+    success: (snapshot, {stale = false}) =>
+        (snapshot.grant, !stale, snapshot.targetTenantStatus),
+    failure: (_, __) => (null, false, null),
+    offline: (cached) => (cached?.grant, false, cached?.targetTenantStatus),
   );
   final targetStatus = grant == null
       ? null
-      : ref
-          .watch(platformTenantStoreProvider)
-          .lifecycleStatusOf(grant.tenant.tenantId);
+      : vouched ??
+          ref
+              .watch(platformTenantStoreProvider)
+              .lifecycleStatusOf(grant.tenant.tenantId);
   return BreakGlassAccessPolicy.evaluate(
     sessionRole: role,
     grant: grant,

@@ -13,6 +13,7 @@ import '../../../l10n/strings.dart';
 import '../../detachment/data/detachment_providers.dart';
 import '../data/detachment_group_providers.dart';
 import '../domain/detachment_group_models.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Create (`id == null`) or edit a detachment group.
 ///
@@ -175,7 +176,7 @@ class _DetachmentGroupEditPageState
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -235,7 +236,7 @@ class _DetachmentGroupEditPageState
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

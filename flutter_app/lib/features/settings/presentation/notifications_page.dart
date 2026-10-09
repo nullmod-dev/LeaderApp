@@ -156,7 +156,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(S.offlineTitle)),
+        actionNeedsConnectionSnackBar,
       ),
     );
   }

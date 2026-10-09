@@ -15,6 +15,7 @@ import '../data/workshop_stats_report.dart';
 import '../domain/workshop_models.dart';
 import '../domain/workshop_stats.dart';
 import 'widgets/workshop_people.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Add (`participantId == null`) or edit one of a workshop's own team
 /// members: a typed name, one of five roles, and whether they paid.
@@ -251,7 +252,7 @@ class _WorkshopMemberFormPageState
       failure: (message, _) =>
           messenger.showSnackBar(SnackBar(content: Text(message))),
       offline: (_) =>
-          messenger.showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          messenger.showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../auth/presentation/device_trust_bar.dart';
+import '../auth/presentation/offline_copy_bar.dart';
 import '../demo/presentation/demo_trial_bar.dart';
 import '../../core/access/admin_experience.dart';
 import '../../core/access/capability_guard.dart';
@@ -105,37 +107,51 @@ class MainShell extends ConsumerWidget {
       // nothing at all for every real session.
       body: Column(children: [
         const DemoTrialBar(),
+        // Running on the stored copy of the account, offline.
+        const OfflineCopyBar(),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                // Same gesture and the same direction rule as the detail-shell
-                // tabs. A detail shell nested inside a branch has its own
-                // SwipeTabs, and being deeper in the tree it wins the gesture
-                // arena — so swiping a detachment's tabs never also moves the
-                // bottom nav.
-                child: SwipeTabs(
-                  currentIndex: index,
-                  tabCount: destinations.length,
-                  enabled: atBranchRoot,
-                  onSwitch: goTo,
-                  child: TabSwitchTransition(
-                    index: branchIndex,
-                    child: navigationShell,
+          child: OfflineCopyInset(
+            child: Column(children: [
+              // Device trust: a new device's restriction, or new devices
+              // waiting for this trusted one's answer. Nothing for every
+              // other session.
+              const DeviceTrustBar(),
+              Expanded(
+                child: DeviceTrustBodyInset(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        // Same gesture and the same direction rule as the
+                        // detail-shell tabs. A detail shell nested inside a
+                        // branch has its own SwipeTabs, and being deeper in
+                        // the tree it wins the gesture arena — so swiping a
+                        // detachment's tabs never also moves the bottom nav.
+                        child: SwipeTabs(
+                          currentIndex: index,
+                          tabCount: destinations.length,
+                          enabled: atBranchRoot,
+                          onSwitch: goTo,
+                          child: TabSwitchTransition(
+                            index: branchIndex,
+                            child: navigationShell,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: GlassBottomNav(
+                          destinations: destinations,
+                          currentIndex: index,
+                          onDestinationSelected: goTo,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: GlassBottomNav(
-                  destinations: destinations,
-                  currentIndex: index,
-                  onDestinationSelected: goTo,
-                ),
-              ),
-            ],
+            ]),
           ),
         ),
       ]),

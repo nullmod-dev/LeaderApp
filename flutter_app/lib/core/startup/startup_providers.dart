@@ -38,5 +38,6 @@ final startupDestinationProvider = Provider<StartupDestination>((ref) {
     // Point 17A — the pre-session journey; `EntryNone` until 17B wires the
     // controller's restore into startup.
     entry: ref.watch(authEntryStateProvider),
+    launchFailure: ref.watch(launchFailureProvider),
   ));
 });

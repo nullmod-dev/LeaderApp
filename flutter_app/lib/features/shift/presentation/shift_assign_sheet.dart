@@ -310,7 +310,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
         _duplicateId = null;
       }),
       failure: (message, _) => setState(() => _message = message),
-      offline: (_) => setState(() => _message = S.offlineTitle),
+      offline: (_) => setState(() => _message = S.actionNeedsConnection),
     );
     setState(() => _busyIds.remove(candidate.member.id));
     _invalidate(ref);
@@ -336,7 +336,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
     match.when(
       success: (data, {stale = false}) => existing = data,
       failure: (message, _) => lookupError = message,
-      offline: (_) => lookupError = S.offlineTitle,
+      offline: (_) => lookupError = S.actionNeedsConnection,
     );
     if (lookupError != null) {
       setState(() {
@@ -365,7 +365,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
     created.when(
       success: (data, {stale = false}) => member = data,
       failure: (message, _) => createError = message,
-      offline: (_) => createError = S.offlineTitle,
+      offline: (_) => createError = S.actionNeedsConnection,
     );
     if (member == null) {
       setState(() {
@@ -386,7 +386,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
         _message = S.memberCreatedAndAssigned;
       }),
       failure: (message, _) => setState(() => _message = message),
-      offline: (_) => setState(() => _message = S.offlineTitle),
+      offline: (_) => setState(() => _message = S.actionNeedsConnection),
     );
     setState(() => _manualBusy = false);
     ref.invalidate(teamListProvider(shift.detachmentId));
@@ -821,7 +821,7 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
     if (author == null) {
       setState(() {
         _correctionBusy = false;
-        _correctionError = S.offlineTitle;
+        _correctionError = S.actionNeedsConnection;
       });
       return;
     }
@@ -849,7 +849,7 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
     result.when(
       success: (s, {stale = false}) => updated = s,
       failure: (message, _) => _correctionError = message,
-      offline: (_) => _correctionError = S.offlineTitle,
+      offline: (_) => _correctionError = S.actionNeedsConnection,
     );
     // Other screens (the manage sheet, statistics, member history) refresh
     // through these; this sheet already has the fresh shift from `result`
@@ -936,7 +936,7 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
         }
       },
       failure: (message, _) => _error = message,
-      offline: (_) => _error = S.offlineTitle,
+      offline: (_) => _error = S.actionNeedsConnection,
     );
     ref.invalidate(weekShiftsProvider);
     ref.invalidate(todaysShiftsProvider);

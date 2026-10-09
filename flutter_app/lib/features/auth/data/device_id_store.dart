@@ -1,12 +1,20 @@
-/// A random per-installation identifier, sent only as `X-Device-Id` on
-/// `POST /auth/google`, so the backend can budget failed Google sign-ins per
-/// device instead of per IP — many mobile users share one carrier IP.
+/// A random per-installation identifier, sent as `X-Device-Id` on every API
+/// request. The backend keys device trust on it (`docs/api/auth.md` → Device
+/// trust: a new device needs an email code and starts restricted) and budgets
+/// failed Google sign-ins per device instead of per IP — many mobile users
+/// share one carrier IP.
 ///
-/// A UUID v4 from `Random.secure()`, minted the first time it is asked for and
-/// kept in [LocalStore] under [DeviceIdStore.storageKey]. It names this
+/// A UUID v4 from `Random.secure()`, minted on the first launch that asks for
+/// it and kept in [SecureStore] under [DeviceIdStore.storageKey]. It names this
 /// installation and nothing else: no account, no hardware id, no advertising
-/// id. Clearing the app's data mints a new one, which is fine — the backend's
-/// per-IP backstop, not this id, is what stops a client that rotates it.
+/// id. The server stores only its hash.
+///
+/// **A reinstall is a new device.** Android wipes secure storage with the app;
+/// the iOS Keychain does not, so a marker in [LocalStore] (which every
+/// platform wipes on uninstall) tells this installation's own id from one an
+/// earlier installation left behind. An id minted before secure storage held
+/// it (in [LocalStore], same key) is moved over once and kept, so a phone
+/// that updates the app stays the same device.
 library;
 
 import 'dart:math';
@@ -14,27 +22,48 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/local_store.dart';
-import 'auth_providers.dart' show localStoreProvider;
+import '../../../core/storage/secure_store.dart';
+import 'auth_providers.dart' show localStoreProvider, secureStoreProvider;
 
 class DeviceIdStore {
-  DeviceIdStore(this._store, {Random? random})
+  DeviceIdStore(this._secure, this._local, {Random? random})
       : _random = random ?? Random.secure();
 
   static const storageKey = 'mtm.device.id';
 
-  final LocalStore _store;
+  /// In [LocalStore]: this installation already holds its id in secure storage.
+  static const installedKey = 'mtm.device.installed';
+
+  final SecureStore _secure;
+  final LocalStore _local;
   final Random _random;
+
   Future<String>? _pending;
 
   /// This installation's id; the same value for the life of the install.
   Future<String> read() => _pending ??= _load();
 
   Future<String> _load() async {
-    final stored = await _store.readString(storageKey);
-    if (stored != null && isUuidV4(stored)) return stored;
-    final minted = uuidV4(_random);
-    await _store.writeString(storageKey, minted);
-    return minted;
+    final legacy = await _local.readString(storageKey);
+    final installed = await _local.readString(installedKey) != null;
+    String? id;
+    if (legacy != null && isUuidV4(legacy)) {
+      // Minted by an earlier build of this same installation: keep it.
+      id = legacy;
+      await _secure.writeString(storageKey, legacy);
+    } else if (installed) {
+      final stored = await _secure.readString(storageKey);
+      if (stored != null && isUuidV4(stored)) id = stored;
+    }
+    // No marker: a fresh install. An id still in the Keychain belongs to an
+    // earlier installation and is not reused.
+    if (id == null) {
+      id = uuidV4(_random);
+      await _secure.writeString(storageKey, id);
+    }
+    if (!installed) await _local.writeString(installedKey, '1');
+    if (legacy != null) await _local.remove(storageKey);
+    return id;
   }
 }
 
@@ -55,5 +84,8 @@ String uuidV4([Random? random]) {
 }
 
 final deviceIdStoreProvider = Provider<DeviceIdStore>((ref) {
-  return DeviceIdStore(ref.watch(localStoreProvider));
+  return DeviceIdStore(
+    ref.watch(secureStoreProvider),
+    ref.watch(localStoreProvider),
+  );
 });

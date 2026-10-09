@@ -91,8 +91,46 @@ void main() {
 
   testWidgets('the approved contacts are displayed exactly', (tester) async {
     await _open(tester);
-    expect(find.text('medical.team.auth@gmail.com'), findsOneWidget);
+    expect(find.text('07701322947'), findsOneWidget);
+    expect(find.text('mtm.auth.teams@gmail.com'), findsOneWidget);
     expect(find.text('@jjkkkj'), findsOneWidget);
+  });
+
+  testWidgets('WhatsApp asks first, and «ليس الآن» opens nothing',
+      (tester) async {
+    final launcher = await _open(tester);
+    await tester.ensureVisible(find.byKey(const Key('about-open-whatsApp')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-open-whatsApp')));
+    await _settle(tester);
+
+    // The question names where the person is going and which account.
+    expect(find.text(S.supportHandoffWhatsAppTitle), findsOneWidget);
+    expect(find.byKey(const Key('support-handoff-value-whatsApp')),
+        findsOneWidget);
+    expect(launcher.asked, isEmpty, reason: 'nothing opens before «نعم»');
+
+    await tester.tap(find.byKey(const Key('support-handoff-cancel')));
+    await _settle(tester);
+    expect(find.text(S.supportHandoffWhatsAppTitle), findsNothing);
+    expect(launcher.asked, isEmpty);
+  });
+
+  testWidgets('WhatsApp «نعم» opens the support chat in the app',
+      (tester) async {
+    final launcher = await _open(tester);
+    await tester.ensureVisible(find.byKey(const Key('about-open-whatsApp')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('about-open-whatsApp')));
+    await _settle(tester);
+    await tester.tap(find.byKey(const Key('support-handoff-confirm')));
+    await _settle(tester);
+
+    expect(launcher.asked, [supportWhatsAppAppUri()]);
+    expect(launcher.asked.single.toString(),
+        'whatsapp://send?phone=9647701322947');
+    // The sheet leaves with the hand-off.
+    expect(find.text(S.supportHandoffWhatsAppTitle), findsNothing);
   });
 
   testWidgets('no Privacy or Terms destination exists', (tester) async {
@@ -112,11 +150,12 @@ void main() {
   testWidgets('the email button opens a mailto for the approved address',
       (tester) async {
     final launcher = await _open(tester);
+    await _reveal(tester, const Key('about-open-email'));
     await tester.tap(find.byKey(const Key('about-open-email')));
     await _settle(tester);
 
     expect(launcher.asked.single, emailUri());
-    expect(launcher.asked.single.path, 'medical.team.auth@gmail.com');
+    expect(launcher.asked.single.path, 'mtm.auth.teams@gmail.com');
     // Nothing is claimed on success — the user is in their mail app.
     expect(find.byType(SnackBar), findsNothing);
   });
@@ -125,6 +164,7 @@ void main() {
       (tester) async {
     final launcher =
         await _open(tester, answers: [ExternalLinkOutcome.unsupported]);
+    await _reveal(tester, const Key('about-open-email'));
     await tester.tap(find.byKey(const Key('about-open-email')));
     await _settle(tester);
 
@@ -135,6 +175,7 @@ void main() {
   testWidgets('a failed handoff says so and never shows a raw exception',
       (tester) async {
     await _open(tester, answers: [ExternalLinkOutcome.failed]);
+    await _reveal(tester, const Key('about-open-email'));
     await tester.tap(find.byKey(const Key('about-open-email')));
     await _settle(tester);
 
@@ -154,6 +195,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('about-open-telegram')));
     await _settle(tester);
+    expect(launcher.asked, isEmpty, reason: 'nothing opens before «نعم»');
+    await tester.tap(find.byKey(const Key('support-handoff-confirm')));
+    await _settle(tester);
 
     expect(launcher.asked, [telegramAppUri(), telegramWebUri()]);
     expect(launcher.asked.last.toString(), 'https://t.me/jjkkkj');
@@ -170,6 +214,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('about-open-telegram')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('about-open-telegram')));
+    await _settle(tester);
+    await tester.tap(find.byKey(const Key('support-handoff-confirm')));
     await _settle(tester);
 
     expect(launcher.asked, [telegramAppUri()]);
@@ -191,11 +237,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('about-open-telegram')));
     await _settle(tester);
+    await tester.tap(find.byKey(const Key('support-handoff-confirm')));
+    await _settle(tester);
 
     expect(launcher.asked, hasLength(2));
+    // Said inside the sheet, which stays up with the handle ready to copy.
     expect(find.text(S.aboutTelegramUnsupported), findsOneWidget);
-    // And the value is still there to copy.
-    expect(find.byKey(const Key('about-copy-telegram')), findsOneWidget);
+    expect(find.byKey(const Key('support-handoff-copy-telegram')),
+        findsOneWidget);
   });
 
   testWidgets('copy puts the exact displayed value on the clipboard',
@@ -215,9 +264,10 @@ void main() {
 
     await _open(tester);
 
+    await _reveal(tester, const Key('about-copy-email'));
     await tester.tap(find.byKey(const Key('about-copy-email')));
     await _settle(tester);
-    expect(copied.last, 'medical.team.auth@gmail.com');
+    expect(copied.last, 'mtm.auth.teams@gmail.com');
     expect(find.text(S.aboutEmailCopied), findsOneWidget);
 
     // Let the confirmation go and bring the second contact clear of the
@@ -252,11 +302,23 @@ void main() {
     );
     await tester.pump();
     expect(find.text('@jjkkkj'), findsOneWidget);
-    expect(find.text('medical.team.auth@gmail.com'), findsOneWidget);
+    expect(find.text('mtm.auth.teams@gmail.com'), findsOneWidget);
   });
 }
 
 // -----------------------------------------------------------------------------
+
+/// Brings a support control clear of the floating bottom nav: the contacts
+/// are the last block on the page, under the capability list.
+Future<void> _reveal(WidgetTester tester, Key key) async {
+  await tester.scrollUntilVisible(
+    find.byKey(key),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.drag(find.byType(Scrollable).first, const Offset(0, -200));
+  await tester.pumpAndSettle();
+}
 
 Future<_FakeLauncher> _open(
   WidgetTester tester, {

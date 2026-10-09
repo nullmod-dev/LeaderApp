@@ -993,6 +993,9 @@ abstract final class S {
   static const forgotSub = 'أدخل بريدك، وسنرسل لك رمز تحقق مكوّنا من ٦ أرقام.';
   static const otpTitle = 'رمز التحقق';
   static const otpSub = 'أدخل الرمز الذي أرسلناه إلى بريدك.';
+
+  /// `%s` is the address `/forgot` sent the code to, already isolated LTR.
+  static const otpSubTo = 'أدخل الرمز الذي أرسلناه إلى %s.';
   static const newPasswordTitle = 'كلمة مرور جديدة';
   static const newPasswordSub = '٨ أحرف على الأقل، تتضمن حرفا كبيرا ورقما.';
   static const sessionExpiredTitle = 'انتهت الجلسة';
@@ -2273,6 +2276,18 @@ abstract final class S {
   static const simpleAdminCapabilitiesLead =
       'لا تظهر صلاحيات الوحدات غير المتاحة في خطة المؤسسة. يظل الخادم صاحب القرار النهائي.';
   static const simpleAdminCapabilityRequired = 'اختر صلاحية واحدة على الأقل.';
+  static const simpleAdminScope = 'نطاق الصلاحيات';
+  static const simpleAdminScopeLead =
+      'صلاحيات المفرزات والأعضاء والشفتات والمخزون والإحصاءات تنطبق على كل '
+      'المفرزات أو على مفرزات تختارها. صلاحيات الورش على مستوى الفريق دائمًا.';
+  static const simpleAdminScopeAll = 'كل المفرزات';
+  static const simpleAdminScopeAllSub = 'ومنها أي مفرزة تُنشأ لاحقًا.';
+  static const simpleAdminScopeSome = 'مفرزات محددة';
+  static const simpleAdminScopeSomeSub = 'لا يرى غيرها ولا يعمل فيها.';
+  static const simpleAdminScopeRequired = 'اختر مفرزة واحدة على الأقل.';
+  static const simpleAdminScopeLoadFailed =
+      'تعذّر تحميل المفرزات. اسحب للتحديث أو حاول لاحقًا.';
+  static const simpleAdminScopeEmpty = 'لا توجد مفرزات بعد.';
   static const simpleAdminSendInvitation = 'إرسال الدعوة';
   static const simpleAdminNoPasswordNote =
       'لا توجد كلمة مرور مؤقتة. ينشئ المدعو بيانات دخوله بنفسه ضمن تدفق الانضمام الآمن.';
@@ -2499,6 +2514,12 @@ abstract final class S {
   static const platformCommerceDevOnlyNote =
       'تُحفظ هذه الإعدادات محليا في هذا الجهاز، ولا يتم عبرها أي دفع. '
       'يتولى الخادم التسعير والتحصيل عند وصله.';
+  static const platformCommerceServerNote =
+      'تُحفظ العروض والقسائم على الخادم ويراها كل المشتركين. لا يتم عبر '
+      'التطبيق أي دفع، ولا تُستهلك قسيمة إلا عند تأكيد دفع من لوحة الإدارة.';
+  static const platformCommerceLoadFailed = 'تعذّر تحميل العروض والقسائم';
+  static const platformCommerceLoadFailedBody =
+      'المعروض قد لا يطابق الخادم. أعد المحاولة قبل أي تعديل.';
   static const platformCommerceBasePrices = 'الأسعار الأساسية';
   static const platformCommerceBasePricesNote =
       'تُعرض الأسعار هنا للقراءة فقط ولا تُعدّل من هذا البناء.';
@@ -2629,13 +2650,17 @@ abstract final class S {
 
   static const aboutSupport = 'الدعم';
   static const aboutSupportBody =
-      'للاستفسارات والمشكلات، تواصل عبر البريد الإلكتروني أو Telegram.';
+      'للاستفسارات والمشكلات، راسلنا عبر WhatsApp أو Telegram أو البريد '
+      'الإلكتروني.';
   static const aboutSupportEmailLabel = 'البريد الإلكتروني';
   static const aboutSupportTelegramLabel = 'Telegram';
+  static const aboutSupportWhatsAppLabel = 'WhatsApp';
   static const aboutSupportEmailAction = 'مراسلة عبر البريد';
   static const aboutSupportTelegramAction = 'فتح Telegram';
+  static const aboutSupportWhatsAppAction = 'مراسلة عبر WhatsApp';
   static const aboutEmailCopied = 'تم نسخ البريد الإلكتروني';
   static const aboutTelegramCopied = 'تم نسخ معرف Telegram';
+  static const aboutWhatsAppCopied = 'تم نسخ رقم WhatsApp';
   // Two failure sentences, because they need two different answers from the
   // user: nothing on the device handles the link (copy it and use another
   // device or app), or the handoff itself failed (try again).
@@ -2644,7 +2669,28 @@ abstract final class S {
   static const aboutTelegramUnsupported =
       'تعذّر فتح Telegram على هذا الجهاز. انسخ المعرف واستخدمه في تطبيق '
       'Telegram.';
+  static const aboutWhatsAppUnsupported =
+      'تعذّر فتح WhatsApp على هذا الجهاز. انسخ الرقم وراسلنا منه.';
   static const aboutLaunchFailed = 'تعذّر فتح التطبيق. حاول مرة أخرى.';
+
+  // ---------- Support hand-off (WhatsApp / Telegram) ----------
+  // Asked before leaving the app: the person tapped a contact, and the next
+  // thing on screen is another application.
+  static const supportHandoffWhatsAppTitle = 'الانتقال إلى WhatsApp؟';
+  static const supportHandoffTelegramTitle = 'الانتقال إلى Telegram؟';
+  static const supportHandoffWhatsAppBody =
+      'سنفتح WhatsApp على محادثة مع حساب دعم $productNameAr. يمكنك العودة '
+      'إلى التطبيق متى شئت.';
+  static const supportHandoffTelegramBody =
+      'سنفتح Telegram على حساب دعم $productNameAr. يمكنك العودة إلى التطبيق '
+      'متى شئت.';
+  static const supportHandoffAccount = 'حساب الدعم';
+  static const supportHandoffWhatsAppConfirm = 'نعم، افتح WhatsApp';
+  static const supportHandoffTelegramConfirm = 'نعم، افتح Telegram';
+  static const supportHandoffCancel = 'ليس الآن';
+
+  /// The quiet way to support from the sign-in screen, under «إنشاء حساب».
+  static const loginSupportPrompt = 'تحتاج مساعدة؟';
 
   // ---------- Startup / session states (Point 3) ----------
   // One sentence per state, and each one has to answer a different question
@@ -2654,11 +2700,127 @@ abstract final class S {
   static const startupRestoring = 'جارٍ فتح التطبيق';
   static const startupRestoringSub = 'يتم استعادة الجلسة على هذا الجهاز.';
 
+  /// Under the mark once a launch has waited 3 s for the server.
+  static const startupSlowNetwork =
+      'الاتصال بطيء… سنفتح آخر نسخة محفوظة إن لم يصل الخادم';
+
+  // A launch that could read nothing: no stored copy, and the server
+  // unreachable or failing. Network and server say different things because
+  // the fixes differ — the person's Wi-Fi, or waiting.
+  static const launchOfflineTitle = 'لا يوجد اتصال بالإنترنت';
+  static const launchOfflineBody = 'تحقّق من الشبكة ثم أعد المحاولة.';
+  static const launchServerErrorTitle = 'الخادم لا يستجيب الآن';
+  static const launchServerErrorBody =
+      'المشكلة ليست في هاتفك. أعد المحاولة بعد قليل.';
+  static const launchServerStillFailing =
+      'ما زال الخادم لا يستجيب. أعد المحاولة بعد قليل.';
+
+  /// One sentence for every action that needs the server, said when the
+  /// phone is offline. Replaces the bare «بدون اتصال» at each call site.
+  static const actionNeedsConnection = 'يحتاج هذا الإجراء إلى اتصال بالإنترنت';
+
+  /// The shell's offline bar while the app runs on the stored copy.
+  static const offlineCopyBanner = 'بدون اتصال — تعمل على آخر نسخة محفوظة';
+
+  /// Added to the bar in the last 48 hours of the offline window; `%s` is the
+  /// hour count, already in Arabic-Indic digits.
+  static const offlineCopyEndsIn = 'ينتهي الدخول دون اتصال خلال %s ساعة';
+
   static const offlineSessionExpiredTitle = 'انتهت صلاحية الدخول دون اتصال';
   static const offlineSessionExpiredBody =
-      'مرّت ٧ أيام على تسجيل دخولك. اتصل بالإنترنت ثم أعد المحاولة.';
+      'مرّت ٧ أيام على آخر اتصال لهذا الهاتف بالخادم. اتصل بالإنترنت ثم أعد المحاولة.';
   static const offlineSessionStillOffline =
       'ما زلت دون اتصال. تحقّق من الشبكة ثم أعد المحاولة.';
+
+  // ---------- Device trust ----------
+  // A sign-in from a device the account does not trust yet: a code first.
+  static const newDeviceVerificationTitle = 'تأكيد هذا الجهاز';
+  static const newDeviceCodeSentTo =
+      'لم يُستخدم هذا الجهاز مع حسابك من قبل. أرسلنا رمز تأكيد إلى ';
+
+  // The restricted window of a new device: the shell banner, and the
+  // sentence every refused action shows (`session_restricted`).
+  static const deviceRestrictedBanner =
+      'جهاز جديد: تعديل البيانات السابقة وإعدادات الحساب مقفل حتى ';
+  static const deviceLimitBanner =
+      'هذا الجهاز غير موثوق: بعض الإجراءات مقفلة حتى يؤكّده أحد أجهزتك الموثوقة.';
+  static const errSessionRestrictedTitle = 'مقفل مؤقتاً على هذا الجهاز';
+  static const errSessionRestricted =
+      'هذا جهاز جديد على حسابك، فلا يمكنه بعدُ تعديل البيانات السابقة أو إعدادات الحساب. '
+      'يمكنك الإضافة وتعديل ما أضفته منه، ويُرفع القفل بانتهاء المهلة أو بتأكيده من جهاز موثوق.';
+
+  // Sign-in refusals that device trust adds.
+  static const onboardingDeviceBlocked =
+      'حُظر هذا الجهاز من الدخول إلى هذا الحساب. استخدم جهازاً آخر أو تواصل مع مدير فريقك.';
+  static const onboardingPasswordResetRequired =
+      'لأسباب أمنية، أعد تعيين كلمة المرور قبل الدخول بها. اختر «نسيت كلمة المرور؟».';
+  static const onboardingAppUpdateRequired =
+      'هذا الإصدار من التطبيق قديم ولا يمكنه تسجيل الدخول. حدّثه ثم حاول مجدداً.';
+
+  // A trusted device: the notice and the Yes / No prompt (`/new-device`).
+  static const pendingDeviceBanner =
+      'سجّل جهاز جديد الدخول إلى حسابك. هل هو أنت؟';
+  static const pendingDeviceReview = 'مراجعة';
+  static const newDeviceApprovalTitle = 'جهاز جديد على حسابك';
+  static const newDeviceApprovalSub =
+      'دخل هذا الجهاز إلى حسابك بعد إدخال رمز وصل إلى بريدك. هل هو جهازك؟';
+  static const newDeviceSignedInAt = 'سجّل الدخول في ';
+  static const newDeviceYes = 'نعم، هذا جهازي';
+  static const newDeviceNo = 'لا، ليس أنا';
+  static const newDeviceApproved = 'أكّدنا الجهاز، ورُفع القفل عنه.';
+  static const newDeviceLimitReached =
+      'لديك العدد الأقصى من الأجهزة الموثوقة. أزل جهازاً من «أجهزتي» ثم أكّد هذا الجهاز.';
+  static const newDeviceNoneTitle = 'لا أجهزة بانتظار ردّك';
+  static const newDeviceNoneBody =
+      'كل الأجهزة الجديدة على حسابك أُكّدت أو انتهت مهلتها.';
+  static const newDeviceDenyTitle = 'ليس جهازك؟';
+  static const newDeviceDenyBody =
+      'سنحظر ذلك الجهاز وننهي كل جلسات حسابك، ومنها جلسة هذا الهاتف، ونبلغ المسؤول عن حسابك.';
+  static const newDeviceDenyAction = 'حظر الجهاز وإنهاء الجلسات';
+  static const newDeviceDenyUnchanged =
+      'تبقى بيانات حسابك وفريقك كما هي، ويبقى هذا الهاتف موثوقاً حين تسجّل الدخول من جديد.';
+
+  // After "No" (`/account-secured`).
+  static const accountSecuredTitle = 'حمَينا حسابك';
+  static const accountSecuredPasswordBody =
+      'حظرنا الجهاز الآخر وأنهينا كل الجلسات. أعد تعيين كلمة المرور الآن، فقد تكون معروفة لغيرك.';
+  static const accountSecuredGoogleBody =
+      'حظرنا الجهاز الآخر وأنهينا كل الجلسات. سجّل الدخول من جديد، وراجع أمان حساب Google الخاص بك.';
+  static const accountSecuredReset = 'إعادة تعيين كلمة المرور';
+
+  // My devices (`/more/security/devices`).
+  static const myDevicesTitle = 'أجهزتي';
+  static const myDevicesSub = 'الأجهزة الموثوقة تدخل إلى حسابك دون رمز.';
+  static const myDevicesCount = '%s من %s أجهزة موثوقة';
+  static const myDevicesEmpty = 'لا أجهزة مسجّلة بعد.';
+  static const myDevicesRestrictedNote =
+      'لا يمكن إزالة الأجهزة من جهاز جديد حتى يُرفع القفل عنه.';
+  static const deviceThisDevice = 'هذا الجهاز';
+  static const deviceStatusTrusted = 'موثوق';
+  static const deviceStatusRestricted = 'مقيّد مؤقتاً';
+  static const deviceStatusUntrusted = 'غير موثوق';
+  static const deviceLastSeen = 'آخر استخدام ';
+  static const deviceRemove = 'إزالة';
+  static const deviceRemoveTitle = 'إزالة هذا الجهاز؟';
+  static const deviceRemoveBody =
+      'ستنتهي جلساته، وسيحتاج إلى رمز يصل إلى بريدك ليدخل من جديد.';
+  static const deviceRemoved = 'أُزيل الجهاز.';
+  static const deviceRemoveUnchanged = 'لا تُحذف أي بيانات أضافها هذا الجهاز.';
+
+  // Security: how long this phone still opens offline.
+  static const securityOfflineAccess = 'الدخول دون اتصال';
+  static const offlineAccessUntil = 'متاح حتى %s (بقي %s)';
+  static const offlineAccessEnded = 'غير متاح — اتصل لتجديده';
+  static const daysLessThanOne = 'أقل من يوم';
+  static const daysOne = 'يوم واحد';
+  static const daysTwo = 'يومان';
+  static const daysFew = '%s أيام';
+
+  // Sign-out: what leaving this phone means for the offline copy.
+  static const signOutOfflineCopyNote =
+      'سيُحذف حسابك المحفوظ من هذا الهاتف، ولن يفتح التطبيق دون اتصال حتى تسجّل الدخول من جديد.';
+  static const signOutOfflineServerNote =
+      'وتبقى جلستك على الخادم حتى تنتهي خلال ٧ أيام.';
 
   static const sessionInvalidTitle = 'بيانات الحساب غير صالحة';
   static const sessionInvalidBody =
@@ -2827,8 +2989,10 @@ abstract final class S {
       'تعذّرت المتابعة عبر Google. حاول مرة أخرى.';
   static const onboardingGoogleUnavailable =
       'المتابعة عبر Google غير متاحة في هذا الإصدار. استخدم البريد وكلمة المرور.';
+  // General on purpose: naming the method an address was registered with
+  // tells a stranger that the address has an account, and how it signs in.
   static const onboardingMethodLinkRequired =
-      'هذا البريد مسجَّل بكلمة مرور. سجّل الدخول بكلمة المرور.';
+      'تعذّر الدخول بهذه الطريقة. جرّب طريقة دخول أخرى.';
   static const onboardingUnsupportedMethod =
       'طريقة الدخول هذه غير متاحة حالياً.';
   static const onboardingTeamCodeMalformed = 'صيغة رمز الفريق غير صحيحة.';

@@ -107,10 +107,9 @@ void main() {
   });
 
   testWidgets('an unknown session is not a signed-out one', (tester) async {
-    // A cold start whose session read has not landed, and an offline device
-    // with nothing cached, both look like this. Bouncing either to the login
-    // screen would break the app for exactly the field conditions it is
-    // built for.
+    // An offline device with nothing cached. Bouncing it to the login screen
+    // would break the app for exactly the field conditions it is built for;
+    // it gets the screen that names the network and offers a retry instead.
     final container = _container(const Offline<AuthUser?>());
     final router = await _boot(tester, container,
         ignoreNoise: ignoreKnownPreexistingComplaints);
@@ -118,7 +117,7 @@ void main() {
     router.go('/more/security');
     await settle(tester);
 
-    expect(at(router), '/more/security');
+    expect(at(router), '/launch-offline');
     expect(find.byType(LoginPage), findsNothing);
   });
 

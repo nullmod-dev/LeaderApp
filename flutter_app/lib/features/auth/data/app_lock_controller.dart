@@ -72,6 +72,9 @@ class AppLockController extends Notifier<AppLockStatus> {
         StartupDestination.signedOut ||
         StartupDestination.sessionExpired ||
         StartupDestination.offlineSessionExpired ||
+        // Nothing could be read, so there is no account to protect yet.
+        StartupDestination.launchOffline ||
+        StartupDestination.launchServerError ||
         StartupDestination.invalidSession ||
         StartupDestination.emailVerification ||
         StartupDestination.teamLink ||

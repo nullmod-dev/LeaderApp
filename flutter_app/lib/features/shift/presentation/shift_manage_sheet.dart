@@ -268,7 +268,7 @@ class _ManageBodyState extends ConsumerState<_ManageBody> {
       success: (added, {stale = false}) =>
           _say(added == 0 ? S.quickFillNone : S.quickFillDone),
       failure: (message, _) => _say(message),
-      offline: (_) => _say(S.offlineTitle),
+      offline: (_) => _say(S.actionNeedsConnection),
     );
   }
 

@@ -6,27 +6,24 @@ import 'package:mtm/core/app_info.dart';
 import 'package:mtm/core/brand/brand_mark.dart';
 import 'package:mtm/core/display/frame_rate.dart';
 import 'package:mtm/core/motion/motion_level.dart';
+import 'package:mtm/core/platform/external_links.dart';
 import 'package:mtm/core/result/result.dart';
 import 'package:mtm/core/router/app_router.dart';
 import 'package:mtm/core/theme/app_palette.dart';
 import 'package:mtm/core/theme/app_theme.dart';
 import 'package:mtm/core/theme/theme_controller.dart';
 import 'package:mtm/core/widgets/made_in_iraq.dart';
-import 'package:mtm/features/auth/data/auth_entry_email_provider.dart';
+import 'package:mtm/features/about/domain/support_contacts.dart';
 import 'package:mtm/features/auth/data/auth_providers.dart';
 import 'package:mtm/features/auth/data/mock_auth_repository.dart';
-import 'package:mtm/features/auth/data/mock_onboarding_repository.dart';
-import 'package:mtm/features/auth/presentation/email_verification_page.dart';
 import 'package:mtm/features/auth/presentation/entry_glass.dart';
 import 'package:mtm/features/auth/presentation/google_sign_in_button.dart';
 import 'package:mtm/features/auth/presentation/login_page.dart';
-import 'package:mtm/features/auth/presentation/signup_page.dart';
 import 'package:mtm/features/settings/data/settings_providers.dart';
 import 'package:mtm/features/settings/domain/settings_models.dart';
 import 'package:mtm/features/settings/domain/settings_repository.dart';
 import 'package:mtm/l10n/strings.dart';
 
-import '../../entry_settle.dart';
 
 /// The Leader sign-in screen.
 ///
@@ -77,6 +74,17 @@ class _ThemeOnlyRepository implements SettingsRepository {
   Future<Result<OrgInfo>> orgInfo() async => throw UnimplementedError();
 }
 
+/// Records what the support sheet asked the platform to open.
+class _RecordingLauncher extends ExternalLinkLauncher {
+  final List<Uri> asked = [];
+
+  @override
+  Future<ExternalLinkOutcome> open(Uri uri) async {
+    asked.add(uri);
+    return ExternalLinkOutcome.opened;
+  }
+}
+
 void main() {
   Future<(ProviderContainer, GoRouter)> boot(
     WidgetTester tester, {
@@ -87,6 +95,7 @@ void main() {
     ThemeMode mode = ThemeMode.light,
     bool eyeProtect = false,
     MotionLevel level = MotionLevel.balanced,
+    ExternalLinkLauncher? launcher,
   }) async {
     tester.view.physicalSize = Size(width * 3, height * 3);
     tester.view.devicePixelRatio = 3;
@@ -95,6 +104,8 @@ void main() {
     final container = ProviderContainer(overrides: [
       authRepositoryProvider
           .overrideWithValue(MockAuthRepository(demoAccountsEnabled: false)),
+      if (launcher != null)
+        externalLinkLauncherProvider.overrideWithValue(launcher),
       settingsRepositoryProvider.overrideWithValue(
         _ThemeOnlyRepository(
           mode == ThemeMode.light && !eyeProtect
@@ -364,6 +375,7 @@ void main() {
         ('the CTA', find.widgetWithText(FilledButton, S.signIn)),
         ('Google', find.byKey(const Key('google-sign-in'))),
         ('the password eye', find.byKey(const Key('login-password-toggle'))),
+        ('support', find.byKey(const Key('login-support-open'))),
       ]) {
         await tester.ensureVisible(target);
         await tester.pump();
@@ -373,101 +385,94 @@ void main() {
     });
   });
 
-  group('the email-code way in', () {
-    final codeButton = find.byKey(const Key('login-email-code'));
+  // Device trust run: the email-code button is gone from sign-in. The
+  // `/otp` route and the code endpoints stay (they serve the reset flow and
+  // the new-device code).
+  testWidgets('offers no email-code way in', (tester) async {
+    await boot(tester);
+    expect(find.byKey(const Key('login-email-code')), findsNothing);
+    expect(find.text(S.emailCodeSignIn), findsNothing);
+    expect(find.byKey(const Key('google-sign-in')), findsOneWidget);
+  });
 
-    Future<void> requestCode(WidgetTester tester, String email) async {
-      await tester.enterText(find.byKey(LoginField.keyFor(S.emailLabel)), email);
-      // Focus scrolls the field into view; a scrolling view takes no tap, so
-      // that settles first.
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.ensureVisible(codeButton);
-      await tester.pump();
-      await tester.tap(codeButton);
-      await settleEntry(tester);
+  group('support', () {
+    // The sheet sits over a looping pulse, so `pumpAndSettle` never returns.
+    Future<void> settle(WidgetTester tester) async {
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 200));
+      }
     }
 
-    testWidgets('sits under Google as its sibling, and clears 48dp',
+    testWidgets('is offered under sign-up, above the closing line',
         (tester) async {
       await boot(tester);
-      expect(find.text(S.emailCodeSignIn), findsOneWidget);
-      final google = tester.getRect(find.byKey(const Key('google-sign-in')));
-      final code = tester.getRect(codeButton);
-      expect(code.top, greaterThan(google.bottom));
-      expect(code.height, greaterThanOrEqualTo(48));
-      expect(code.width, google.width);
+      final support = find.byKey(const Key('login-support-open'));
+      expect(support, findsOneWidget);
+      expect(find.text(S.contactSupport), findsOneWidget);
+      expect(tester.getTopLeft(support).dy,
+          greaterThan(tester.getTopLeft(find.text(S.createAccount)).dy));
+      expect(
+          tester.getTopLeft(find.byKey(MadeInIraqFooter.widgetKey)).dy,
+          greaterThan(tester.getTopLeft(support).dy));
     });
 
-    testWidgets('an empty address is asked for, and nothing is sent',
+    testWidgets('lists the three contacts and asks before WhatsApp opens',
         (tester) async {
-      await boot(tester);
-      await tester.ensureVisible(codeButton);
-      await tester.pump();
-      await tester.tap(codeButton);
-      await tester.pump();
-      expect(find.text(S.emailCodeNeedsEmail), findsOneWidget);
+      final launcher = _RecordingLauncher();
+      await boot(tester, launcher: launcher);
+
+      await tester.tap(find.byKey(const Key('login-support-open')));
+      await settle(tester);
+      expect(find.byKey(const Key('support-sheet')), findsOneWidget);
+      for (final name in ['whatsApp', 'telegram', 'email']) {
+        expect(find.byKey(Key('support-channel-$name')), findsOneWidget,
+            reason: name);
+      }
+
+      // Choosing WhatsApp asks; «رجوع» goes back to the list, not out.
+      await tester.tap(find.byKey(const Key('support-channel-whatsApp')));
+      await settle(tester);
+      expect(find.text(S.supportHandoffWhatsAppTitle), findsOneWidget);
+      expect(launcher.asked, isEmpty);
+      await tester.tap(find.byKey(const Key('support-handoff-cancel')));
+      await settle(tester);
+      expect(find.byKey(const Key('support-channel-telegram')), findsOneWidget);
+
+      // «نعم» hands off, and the sheet goes with it.
+      await tester.tap(find.byKey(const Key('support-channel-whatsApp')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('support-handoff-confirm')));
+      await settle(tester);
+      expect(launcher.asked, [supportWhatsAppAppUri()]);
+      expect(find.byKey(const Key('support-sheet')), findsNothing);
       expect(find.byType(LoginPage), findsOneWidget);
-    });
-
-    testWidgets('a registered address goes to its sign-in code',
-        (tester) async {
-      await boot(tester);
-      await requestCode(tester, OnboardingFixtures.verifiedUnlinkedEmail);
-      expect(find.byType(EmailVerificationPage), findsOneWidget);
-      expect(find.text(S.signInVerificationTitle), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('no account yet: sign-up is offered, the address carried over',
+    testWidgets('Telegram opens the support account after «نعم»',
         (tester) async {
-      final (container, _) = await boot(tester);
-      await requestCode(tester, 'new.person@example.org');
-      expect(find.byKey(const Key('login-email-advice')), findsOneWidget);
-      expect(find.text(S.emailEntryFresh), findsOneWidget);
-      expect(find.byType(EmailVerificationPage), findsNothing,
-          reason: 'nobody is sent to wait for a code that never comes');
+      final launcher = _RecordingLauncher();
+      await boot(tester, launcher: launcher);
 
-      final signUp = find.byKey(const Key('login-email-advice-signup'));
-      await tester.ensureVisible(signUp);
-      await tester.pump();
-      expect(tester.getRect(signUp).height, greaterThanOrEqualTo(44));
-      await tester.tap(signUp);
-      await settleEntry(tester);
-      expect(find.byType(SignupPage), findsOneWidget);
-      expect(
-          tester
-              .widget<TextField>(find.byKey(const Key('signup-email')))
-              .controller!
-              .text,
-          'new.person@example.org');
-      expect(container.read(authEntryEmailProvider), isNull,
-          reason: 'handed over once, then forgotten');
+      await tester.tap(find.byKey(const Key('login-support-open')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('support-channel-telegram')));
+      await settle(tester);
+      expect(find.text(S.supportHandoffTelegramTitle), findsOneWidget);
+      await tester.tap(find.byKey(const Key('support-handoff-confirm')));
+      await settle(tester);
+      expect(launcher.asked, [telegramAppUri()]);
     });
 
-    testWidgets('an invitation is named', (tester) async {
-      await boot(tester);
-      await requestCode(tester, OnboardingFixtures.hilalInviteeEmail);
-      expect(find.text(S.emailEntryInvited), findsOneWidget);
-    });
-
-    testWidgets('editing the address takes its advice away', (tester) async {
-      await boot(tester);
-      await requestCode(tester, 'new.person@example.org');
-      expect(find.byKey(const Key('login-email-advice')), findsOneWidget);
-      await tester.enterText(
-          find.byKey(LoginField.keyFor(S.emailLabel)), 'other@example.org');
+    testWidgets('the sheet fits 320dp at 1.6x text', (tester) async {
+      await boot(tester, width: 320, height: 640, textScale: 1.6);
+      await tester.ensureVisible(find.byKey(const Key('login-support-open')));
       await tester.pump();
-      expect(find.byKey(const Key('login-email-advice')), findsNothing);
-    });
-
-    testWidgets('fits 320dp at 1.6x text with the advice open',
-        (tester) async {
-      await boot(tester, width: 320, textScale: 1.6);
-      await requestCode(tester, OnboardingFixtures.hilalInviteeEmail);
-      final advice = find.byKey(const Key('login-email-advice'));
-      await tester.ensureVisible(advice);
-      await tester.pump();
-      expect(tester.getRect(advice).right, lessThanOrEqualTo(320));
+      await tester.tap(find.byKey(const Key('login-support-open')));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('support-channel-whatsApp')));
+      await settle(tester);
+      expect(find.byKey(const Key('support-handoff-confirm')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

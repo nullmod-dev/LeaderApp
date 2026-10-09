@@ -27,7 +27,10 @@ class OutboxController extends AsyncNotifier<List<PendingOperation>> {
   OutboxStore get _store => ref.read(outboxStoreProvider);
 
   @override
-  Future<List<PendingOperation>> build() => _store.readAll();
+  Future<List<PendingOperation>> build() =>
+      // Watched: a backend build keeps one durable queue per account, and a
+      // different account must start from its own.
+      ref.watch(outboxStoreProvider).readAll();
 
   List<PendingOperation> get _current => state.valueOrNull ?? const [];
 

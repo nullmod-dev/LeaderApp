@@ -143,6 +143,120 @@ enum AccessLifecycleField {
   final String wire;
 }
 
+/// Why the server restricts this session's device (`access.deviceRestriction`).
+enum DeviceRestrictionReason {
+  /// A new device inside its restricted window after its email code.
+  newDevice('new_device'),
+
+  /// An untrusted device: the account already trusts the maximum number of
+  /// devices. Restricted until a trusted device approves it.
+  deviceLimit('device_limit'),
+
+  /// A reason this build does not know. Still restricted: the server decides.
+  other('');
+
+  const DeviceRestrictionReason(this.wire);
+
+  final String wire;
+
+  static DeviceRestrictionReason parse(Object? raw) {
+    for (final reason in values) {
+      if (reason != other && reason.wire == raw) return reason;
+    }
+    return other;
+  }
+}
+
+/// The server restricts this session: a new or untrusted device may create
+/// records and edit its own, and nothing that touches older data or the
+/// account (`docs/api/auth.md` → Device trust). Advisory here — the server
+/// refuses the rest with `session_restricted` whatever the app shows.
+@immutable
+class DeviceRestriction {
+  const DeviceRestriction({required this.reason, this.until});
+
+  final DeviceRestrictionReason reason;
+
+  /// When the restriction lifts by itself; `null` for [DeviceRestrictionReason.deviceLimit].
+  final DateTime? until;
+
+  /// `null` for anything that is not the documented object. A malformed value
+  /// costs only the banner; the server still enforces the restriction.
+  static DeviceRestriction? tryParse(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final until = raw['until'];
+    return DeviceRestriction(
+      reason: DeviceRestrictionReason.parse(raw['reason']),
+      until: until is String ? _parseInstant(until) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'reason': reason.wire,
+        if (until != null) 'until': until!.toUtc().toIso8601String(),
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeviceRestriction &&
+      other.reason == reason &&
+      other.until == until;
+
+  @override
+  int get hashCode => Object.hash(reason, until);
+}
+
+/// A new device waiting for this (trusted) device's answer
+/// (`access.pendingDeviceApprovals`).
+@immutable
+class PendingDeviceApproval {
+  const PendingDeviceApproval({
+    required this.id,
+    required this.label,
+    required this.signedInAt,
+  });
+
+  final String id;
+  final String label;
+  final DateTime signedInAt;
+
+  static PendingDeviceApproval? tryParse(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id'];
+    final label = raw['label'];
+    final at = raw['signedInAt'];
+    final signedInAt = at is String ? _parseInstant(at) : null;
+    if (id is! String || id.isEmpty || signedInAt == null) return null;
+    return PendingDeviceApproval(
+      id: id,
+      label: label is String ? label : '',
+      signedInAt: signedInAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
+        'signedInAt': signedInAt.toUtc().toIso8601String(),
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingDeviceApproval &&
+      other.id == id &&
+      other.label == label &&
+      other.signedInAt == signedInAt;
+
+  @override
+  int get hashCode => Object.hash(id, label, signedInAt);
+}
+
+/// An RFC 3339 instant with an explicit offset, in UTC; `null` otherwise.
+DateTime? _parseInstant(String raw) {
+  if (!RegExp(r'(?:[zZ]|[+-]\d{2}:\d{2})$').hasMatch(raw)) return null;
+  return DateTime.tryParse(raw)?.toUtc();
+}
+
 @immutable
 class SessionAccess {
   const SessionAccess({
@@ -151,6 +265,8 @@ class SessionAccess {
     this.demo = DemoMode.none,
     this.mfaRequired = false,
     this.sessionExpiresAt,
+    this.deviceRestriction,
+    this.pendingDeviceApprovals = const [],
     this.unsupported = const {},
   });
 
@@ -201,6 +317,14 @@ class SessionAccess {
       sessionExpiresAt != null &&
       !now.toUtc().isBefore(sessionExpiresAt!.toUtc());
 
+  /// Device trust: this session's device is restricted, or `null`. Not a
+  /// gating field — a restricted session opens the app as usual and the
+  /// server refuses what it may not do.
+  final DeviceRestriction? deviceRestriction;
+
+  /// Device trust: new devices waiting for this trusted device's Yes/No.
+  final List<PendingDeviceApproval> pendingDeviceApprovals;
+
   /// Every gating field that arrived carrying a value this build does not
   /// support, mapped to the raw value as received.
   ///
@@ -226,6 +350,8 @@ class SessionAccess {
     DemoMode? demo,
     bool? mfaRequired,
     DateTime? sessionExpiresAt,
+    DeviceRestriction? deviceRestriction,
+    List<PendingDeviceApproval>? pendingDeviceApprovals,
     Map<AccessLifecycleField, String>? unsupported,
   }) =>
       SessionAccess(
@@ -234,6 +360,9 @@ class SessionAccess {
         demo: demo ?? this.demo,
         mfaRequired: mfaRequired ?? this.mfaRequired,
         sessionExpiresAt: sessionExpiresAt ?? this.sessionExpiresAt,
+        deviceRestriction: deviceRestriction ?? this.deviceRestriction,
+        pendingDeviceApprovals:
+            pendingDeviceApprovals ?? this.pendingDeviceApprovals,
         unsupported: unsupported ?? this.unsupported,
       );
 
@@ -319,12 +448,20 @@ class SessionAccess {
       unsupported[AccessLifecycleField.sessionExpiresAt] = rawExpiry.toString();
     }
 
+    final rawPending = j['pendingDeviceApprovals'];
     return SessionAccess(
       account: account,
       tenant: tenant,
       demo: demo,
       mfaRequired: mfaRequired,
       sessionExpiresAt: sessionExpiresAt,
+      deviceRestriction: DeviceRestriction.tryParse(j['deviceRestriction']),
+      pendingDeviceApprovals: List.unmodifiable([
+        if (rawPending is List)
+          for (final row in rawPending)
+            if (PendingDeviceApproval.tryParse(row) case final pending?)
+              pending,
+      ]),
       unsupported: Map.unmodifiable(unsupported),
     );
   }
@@ -348,6 +485,12 @@ class SessionAccess {
         else if (sessionExpiresAt != null)
           AccessLifecycleField.sessionExpiresAt.wire:
               sessionExpiresAt!.toUtc().toIso8601String(),
+        if (deviceRestriction != null)
+          'deviceRestriction': deviceRestriction!.toJson(),
+        if (pendingDeviceApprovals.isNotEmpty)
+          'pendingDeviceApprovals': [
+            for (final pending in pendingDeviceApprovals) pending.toJson(),
+          ],
       };
 
   static bool _sameUnsupported(
@@ -370,6 +513,8 @@ class SessionAccess {
           other.demo == demo &&
           other.mfaRequired == mfaRequired &&
           other.sessionExpiresAt == sessionExpiresAt &&
+          other.deviceRestriction == deviceRestriction &&
+          listEquals(other.pendingDeviceApprovals, pendingDeviceApprovals) &&
           _sameUnsupported(other.unsupported, unsupported);
 
   @override
@@ -379,6 +524,8 @@ class SessionAccess {
         demo,
         mfaRequired,
         sessionExpiresAt,
+        deviceRestriction,
+        Object.hashAll(pendingDeviceApprovals),
         // Order-independent, so two equal maps built in a different order
         // cannot disagree about their hash.
         Object.hashAllUnordered(

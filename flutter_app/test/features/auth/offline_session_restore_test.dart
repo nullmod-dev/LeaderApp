@@ -57,10 +57,11 @@ const _admin = AuthUser(
   orgName: 'فرق النبض',
 );
 
-/// Plan A3 + D2 — a cold launch with no network opens on the last account
-/// `GET /auth/me` confirmed, for seven days from the sign-in, and only for the
-/// session that read it — matched on the server's `sessionId`, stored beside
-/// the tokens.
+/// A cold launch with no network opens on the last account `GET /auth/me`
+/// confirmed, for seven days from the last successful server contact (device
+/// trust run; it replaced the A3 rule of seven days from the sign-in), and
+/// only for the session that read it — matched on the server's `sessionId`,
+/// stored beside the tokens. Offline opens never extend the seven days.
 void main() {
   late InMemorySecureStore device;
   late DateTime now;
@@ -130,7 +131,8 @@ void main() {
     final raw = device.values[FullSessionSnapshotStore.key]!;
     final record = jsonDecode(raw) as Map<String, dynamic>;
     expect(record['sessionId'], 'sid-1');
-    expect(record['signedInAt'], '2026-10-08T09:00:00.000Z');
+    expect(record['version'], 2);
+    expect(record['lastServerContactAt'], '2026-10-08T09:00:00.000Z');
     expect(raw, isNot(contains('refresh-sid-1')));
     expect(raw, isNot(contains(_access('sid-1'))));
   });
@@ -188,17 +190,61 @@ void main() {
     expect((await launch().currentUser() as Success).data?.id, 'acc-1');
   });
 
-  test('re-reading the same session never moves the sign-in instant', () async {
+  test('each online read moves the seven days; offline opens never do',
+      () async {
     await holdSession('sid-1');
     online();
     await launch().currentUser();
 
+    // A later online read is the new last contact: Oct 12 + 7 days.
     now = DateTime.utc(2026, 10, 12, 9);
     await launch().currentUser();
 
     offline();
     now = DateTime.utc(2026, 10, 15, 9, 1);
-    expect(cachedOf(await launch().currentUser()), isNull);
+    expect(cachedOf(await launch().currentUser())?.id, 'acc-1');
+    now = DateTime.utc(2026, 10, 18, 9);
+    expect(cachedOf(await launch().currentUser())?.id, 'acc-1');
+
+    // The offline opens above did not move it: it still ends on Oct 19.
+    now = DateTime.utc(2026, 10, 19, 9);
+    final r = await launch().currentUser();
+    expect((r as Failure).code, HttpAuthRepository.offlineExpiredCode);
+  });
+
+  test('Security reads the offline end from the last contact', () async {
+    await holdSession('sid-1');
+    online();
+    final repo = launch();
+    await repo.currentUser();
+    expect(repo.offlineTrustEndsAt, DateTime.utc(2026, 10, 15, 9));
+    now = DateTime.utc(2026, 10, 10, 9);
+    await repo.currentUser();
+    expect(repo.offlineTrustEndsAt, DateTime.utc(2026, 10, 17, 9));
+  });
+
+  test('a record written by the sign-in-based build reads as its last contact',
+      () async {
+    await holdSession('sid-1');
+    online();
+    await launch().currentUser();
+    final record = jsonDecode(device.values[FullSessionSnapshotStore.key]!)
+        as Map<String, dynamic>;
+    await device.writeString(
+        FullSessionSnapshotStore.key,
+        jsonEncode({
+          'version': 1,
+          'sessionId': 'sid-1',
+          'user': record['user'],
+          'access': record['access'],
+          'signedInAt': '2026-10-02T09:00:00.000Z',
+        }));
+    offline();
+    now = DateTime.utc(2026, 10, 8, 9, 30);
+    expect(cachedOf(await launch().currentUser())?.id, 'acc-1');
+    now = DateTime.utc(2026, 10, 9, 9);
+    final r = await launch().currentUser();
+    expect((r as Failure).code, HttpAuthRepository.offlineExpiredCode);
   });
 
   test('a clock moved back before the sign-in is not trusted', () async {
@@ -268,7 +314,7 @@ void main() {
     expect(device.values.containsKey(FullSessionSnapshotStore.key), isFalse);
   });
 
-  test('a new session re-reads with a new sign-in instant', () async {
+  test('a new session\'s read is the new last contact', () async {
     await holdSession('sid-1');
     online();
     await launch().currentUser();
@@ -279,7 +325,7 @@ void main() {
     final record = jsonDecode(device.values[FullSessionSnapshotStore.key]!)
         as Map<String, dynamic>;
     expect(record['sessionId'], 'sid-2');
-    expect(record['signedInAt'], '2026-10-14T09:00:00.000Z');
+    expect(record['lastServerContactAt'], '2026-10-14T09:00:00.000Z');
   });
 
   group('every way the session ends removes the copy', () {
@@ -314,9 +360,8 @@ void main() {
       expectGone();
     });
 
-    test('"not me" on a new device', () async {
-      server = (_) => http.Response('', 204);
-      await launch().confirmNewDevice(itsMe: false);
+    test('a trusted device answered "No" (forgetLocalSession)', () async {
+      await launch().forgetLocalSession();
       expectGone();
     });
 

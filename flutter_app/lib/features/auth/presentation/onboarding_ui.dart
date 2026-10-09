@@ -14,7 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
-import '../../about/domain/support_contacts.dart';
+import '../../about/presentation/support_handoff.dart';
 import '../data/auth_providers.dart';
 import '../domain/auth_models.dart';
 import '../domain/onboarding_repository.dart';
@@ -67,6 +67,10 @@ String onboardingErrorMessage(OnboardingErrorKind kind) => switch (kind) {
       OnboardingErrorKind.accountUnavailable => S.onboardingAccountUnavailable,
       OnboardingErrorKind.sessionEnded => S.onboardingSessionEnded,
       OnboardingErrorKind.rateLimited => S.onboardingRateLimited,
+      OnboardingErrorKind.deviceBlocked => S.onboardingDeviceBlocked,
+      OnboardingErrorKind.passwordResetRequired =>
+        S.onboardingPasswordResetRequired,
+      OnboardingErrorKind.appUpdateRequired => S.onboardingAppUpdateRequired,
       OnboardingErrorKind.offline => S.onboardingOfflineNotice,
       OnboardingErrorKind.temporaryFailure => S.onboardingTemporaryFailure,
       OnboardingErrorKind.unknown => S.onboardingUnknownError,
@@ -200,31 +204,7 @@ class OnboardingExitRow extends ConsumerWidget {
           label: const Text(S.signOut),
         ),
         TextButton.icon(
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => AlertDialog(
-              scrollable: true,
-              title: const Text(S.aboutSupport),
-              content: const Directionality(
-                textDirection: TextDirection.ltr,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SelectableText(supportEmail),
-                    SizedBox(height: AppSpacing.sm),
-                    SelectableText(supportTelegram),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(S.close),
-                ),
-              ],
-            ),
-          ),
+          onPressed: () => showSupportSheet(context),
           icon: const Icon(Icons.support_agent_rounded, size: 18),
           label: const Text(S.contactSupport),
         ),

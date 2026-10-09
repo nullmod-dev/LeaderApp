@@ -2,13 +2,21 @@ import '../../../core/network/api_client.dart';
 import '../../../core/result/result.dart';
 import '../domain/saas_tenant_models.dart';
 import '../domain/saas_tenant_repository.dart';
+import '../domain/tenant_lifecycle_models.dart';
 
 /// `/platform/tenants` (`docs/api/platform-tenants.md` §§1–5). Super Admin
 /// only — the server's `platformGuard` refuses any other session.
-class HttpSaasTenantRepository implements SaasTenantRepository {
+class HttpSaasTenantRepository
+    implements SaasTenantRepository, TenantTombstoneSource {
   HttpSaasTenantRepository(this._api);
 
   final ApiClient _api;
+
+  /// Tombstones the server answered with, by team id.
+  final Map<String, DeletedTenantTombstone> _tombstones = {};
+
+  @override
+  DeletedTenantTombstone? tombstoneOf(String tenantId) => _tombstones[tenantId];
 
   static String _one(String id) =>
       '/platform/tenants/${Uri.encodeComponent(id)}';
@@ -26,8 +34,10 @@ class HttpSaasTenantRepository implements SaasTenantRepository {
         parse: (json) => SaasTenantPage.fromJson(json as Map<String, dynamic>),
       );
 
-  /// After final deletion the server answers a tombstone, which this model
-  /// cannot hold; it reads as `not_found` here (decision D9).
+  /// After final deletion the server answers a tombstone, which [SaasTenant]
+  /// cannot hold: it reads as `not_found` here, and the tombstone is kept for
+  /// [tombstoneOf] so the detail screen shows the restricted record rather
+  /// than a plain "not found".
   @override
   Future<Result<SaasTenant>> byId(String tenantId) async {
     final outcome = await _api.exchange('GET', _one(tenantId));
@@ -35,6 +45,12 @@ class HttpSaasTenantRepository implements SaasTenantRepository {
         outcome.ok &&
         outcome.json is Map<String, dynamic> &&
         (outcome.json as Map<String, dynamic>)['status'] == 'deleted') {
+      try {
+        _tombstones[tenantId] = DeletedTenantTombstone.fromJson(
+            outcome.json as Map<String, dynamic>);
+      } on Object {
+        // A record this build cannot read is still a deleted team.
+      }
       return Failure(failureMessage('not_found'), code: 'not_found');
     }
     return ApiClient.resultOf(

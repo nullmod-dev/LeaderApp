@@ -753,7 +753,7 @@ back to `https://wa.me/…`, then offer copy — precisely the sequence
 
 ### 8.1 Support email vs subscription email
 
-`supportEmail` is `medical.team.auth@gmail.com` and is pinned by
+`supportEmail` is `mtm.auth.teams@gmail.com` and is pinned by
 `support_contacts_test.dart`. The subscription email is
 `nullmod.dev@gmail.com`.
 

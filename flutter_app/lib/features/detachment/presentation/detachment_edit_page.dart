@@ -12,6 +12,7 @@ import '../../../core/widgets/section_header.dart';
 import '../../../l10n/strings.dart';
 import '../data/detachment_providers.dart';
 import '../domain/detachment_models.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Create (`id == null`) or edit an existing detachment.
 ///
@@ -252,7 +253,7 @@ class _DetachmentEditPageState extends ConsumerState<DetachmentEditPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -312,7 +313,7 @@ class _DetachmentEditPageState extends ConsumerState<DetachmentEditPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

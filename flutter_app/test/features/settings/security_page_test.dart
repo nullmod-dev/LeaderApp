@@ -82,6 +82,15 @@ void main() {
     expect(find.byKey(const Key('security-session-s_2')), findsOneWidget);
   });
 
+  testWidgets('offers My devices; no offline row without an offline copy',
+      (tester) async {
+    await _pump(tester, Success(_sessions));
+    expect(find.byKey(const Key('security-devices-row')), findsOneWidget);
+    expect(find.text(S.myDevicesTitle), findsOneWidget);
+    // Only a backend build keeps an offline copy to count days for.
+    expect(find.byKey(const Key('security-offline-row')), findsNothing);
+  });
+
   testWidgets('a session list that fails keeps the rest of the screen',
       (tester) async {
     // The account section and the way out do not depend on the network, so a
@@ -245,9 +254,6 @@ class _FakeAuthRepo implements AuthRepository {
   Future<Result<void>> setNewPassword(String password) async =>
       const Success(null);
 
-  @override
-  Future<Result<void>> confirmNewDevice({required bool itsMe}) async =>
-      const Success(null);
 
   @override
   Future<Result<AuthUser>> signIn({

@@ -1,5 +1,6 @@
 import '../../../core/result/result.dart';
 import 'saas_tenant_models.dart';
+import 'tenant_lifecycle_models.dart';
 
 /// The problem codes this module owns.
 ///
@@ -44,6 +45,17 @@ enum SaasTenantProblemCode {
 /// platform session and is never scoped by `saasTenantId`; no implementation
 /// may reach a tenant-operational endpoint or repository to answer one. The
 /// counts on a tenant record arrive *with* the record.
+/// A repository that learns a team's tombstone from its own reads.
+///
+/// The backend answers `GET /platform/tenants/:id` for a finally deleted team
+/// with the tombstone record, which [SaasTenant] cannot hold; the repository
+/// keeps it so the detail screen can show the restricted record instead of a
+/// plain "not found". The mock build has its own store and does not need this.
+abstract interface class TenantTombstoneSource {
+  /// The tombstone a read of [tenantId] returned, or `null` if none has.
+  DeletedTenantTombstone? tombstoneOf(String tenantId);
+}
+
 abstract class SaasTenantRepository {
   /// One page of subscribers matching [query], newest first.
   ///

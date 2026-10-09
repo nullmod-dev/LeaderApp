@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/result/result.dart';
 import 'platform_break_glass_models.dart';
+import '../../../core/access/saas_tenant_status.dart';
 
 enum BreakGlassProblemCode {
   tenantNotFound('tenant_not_found'),
@@ -95,10 +96,24 @@ String breakGlassEndIdempotencyKey({
 /// the most recent terminal one so the UI can say how it ended, or none.
 @immutable
 class BreakGlassSnapshot {
-  const BreakGlassSnapshot({required this.grant, required this.readAt});
+  const BreakGlassSnapshot({
+    required this.grant,
+    required this.readAt,
+    this.targetTenantStatus,
+  });
 
   final BreakGlassGrant? grant;
   final DateTime readAt;
+
+  /// The target team's lifecycle at [readAt], when the source vouches for it.
+  ///
+  /// The backend settles a grant before `GET /current` answers — a grant
+  /// whose team stopped being active comes back already ended
+  /// (`tenant_unavailable`) — so an active grant from the server *is* the
+  /// statement that its team was active. `null` when nothing vouches; the
+  /// access decision then asks the local tenant catalogue, as the mock build
+  /// always has.
+  final SaasTenantStatus? targetTenantStatus;
 }
 
 @immutable

@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/text/bidi.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
+import '../data/auth_entry_email_provider.dart';
 import '../data/auth_providers.dart';
 import '_auth_scaffold.dart';
 import '../../../core/theme/app_typography.dart';
@@ -41,24 +43,31 @@ class _S extends ConsumerState<OtpPage> {
       _busy = true;
       _error = null;
     });
+    // The address `/forgot` sent the code to. The HTTP repository also keeps
+    // it beside the reset token, so this only matters when it does not.
     final r = await ref
         .read(authRepositoryProvider)
-        .verifyResetOtp('user@mtm.org', _code);
+        .verifyResetOtp(ref.read(passwordResetEmailProvider) ?? '', _code);
     if (!mounted) return;
     setState(() => _busy = false);
     r.when(
       success: (_, {stale = false}) => context.push('/new-password'),
       failure: (m, _) => setState(() => _error = m),
-      offline: (_) => setState(() => _error = S.offlineTitle),
+      offline: (_) => setState(() => _error = S.actionNeedsConnection),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final email = ref.watch(passwordResetEmailProvider);
     return AuthScaffold(
       title: S.otpTitle,
-      subtitle: S.otpSub,
+      // Says where the code went, so a typo in the address is noticed here
+      // rather than after waiting for a mail that will never arrive.
+      subtitle: email == null || email.isEmpty
+          ? S.otpSub
+          : S.otpSubTo.replaceFirst('%s', Bidi.ltr(email)),
       showBack: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

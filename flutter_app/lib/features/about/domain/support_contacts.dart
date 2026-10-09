@@ -9,7 +9,8 @@
 /// support contacts and are displayed verbatim; a test pins them, so a typo
 /// cannot ship quietly.
 ///
-/// Support in V1 is a mail address and a Telegram username. There is no ticket
+/// Support in V1 is a WhatsApp number, a Telegram username and a mail
+/// address. There is no ticket
 /// system, no support form, no submission endpoint and no ticket number — a
 /// screen that claimed to have "sent" anything would be describing software
 /// that does not exist.
@@ -18,7 +19,7 @@ library;
 import '../../../l10n/strings.dart';
 
 /// The support mailbox. Displayed exactly as written.
-const String supportEmail = 'medical.team.auth@gmail.com';
+const String supportEmail = 'mtm.auth.teams@gmail.com';
 
 /// The support Telegram username, in the form people recognise — with the `@`.
 /// [telegramUri] strips it, because a URL path may not carry one.
@@ -29,6 +30,13 @@ const String subscriptionEmail = 'nullmod.dev@gmail.com';
 
 /// Displayed in its familiar Iraqi domestic form.
 const String subscriptionWhatsApp = '07701322947';
+
+/// The support WhatsApp number, displayed in the same domestic form.
+///
+/// The same line as [subscriptionWhatsApp] today — the owner's approved
+/// WhatsApp contact. A separate name so the two can part without every
+/// support screen being re-read to find which number it meant.
+const String supportWhatsApp = subscriptionWhatsApp;
 
 /// The subject a support mail opens with.
 ///
@@ -72,13 +80,27 @@ Uri telegramAppUri() => Uri(scheme: 'tg', host: 'resolve', queryParameters: {
 /// second guess.
 Uri telegramWebUri() => Uri.parse('https://t.me/${telegramHandle()}');
 
+/// An Iraqi domestic number in E.164 digits: drop the trunk `0`, add `964`.
+String _iraqE164(String domestic) =>
+    '964${domestic.replaceFirst(RegExp(r'^0'), '')}';
+
 /// WhatsApp destination in E.164 digits: drop the domestic trunk `0` first.
-String whatsAppDigits() =>
-    '964${subscriptionWhatsApp.replaceFirst(RegExp(r'^0'), '')}';
+String whatsAppDigits() => _iraqE164(subscriptionWhatsApp);
 
 Uri whatsAppAppUri() => Uri.parse('whatsapp://send?phone=${whatsAppDigits()}');
 
 Uri whatsAppWebUri() => Uri.parse('https://wa.me/${whatsAppDigits()}');
+
+/// The support WhatsApp number in E.164 digits.
+String supportWhatsAppDigits() => _iraqE164(supportWhatsApp);
+
+/// Opens a chat with the support number in the WhatsApp app.
+Uri supportWhatsAppAppUri() =>
+    Uri.parse('whatsapp://send?phone=${supportWhatsAppDigits()}');
+
+/// The web fallback: `wa.me` opens the app if it is installed after all.
+Uri supportWhatsAppWebUri() =>
+    Uri.parse('https://wa.me/${supportWhatsAppDigits()}');
 
 Uri subscriptionEmailUri() => Uri(
       scheme: 'mailto',

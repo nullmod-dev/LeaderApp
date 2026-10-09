@@ -23,7 +23,7 @@ void main() {
 
   const empty = CommerceState(offers: [], coupons: []);
 
-  test('default seed is reviewable but entirely disabled', () {
+  test('default seed is reviewable but entirely disabled', () async {
     final state = container().read(commerceControlPlaneProvider);
     expect(state.offers, isNotEmpty);
     expect(state.coupons.length, greaterThanOrEqualTo(2));
@@ -31,30 +31,30 @@ void main() {
     expect(state.coupons.every((coupon) => !coupon.enabled), isTrue);
   });
 
-  test('every mutation refuses a missing actor without changing state', () {
+  test('every mutation refuses a missing actor without changing state', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
     final before = scope.read(commerceControlPlaneProvider);
     final results = <Result<Object?>>[
-      plane.createOffer(
+      await plane.createOffer(
         target: BillingOptionId.monthly,
         discount: const PercentageDiscount(10),
       ),
-      plane.updateOffer(
+      await plane.updateOffer(
         'missing',
         target: BillingOptionId.monthly,
         discount: const PercentageDiscount(10),
         enabled: false,
       ),
-      plane.setOfferEnabled('missing', true),
-      plane.removeOffer('missing'),
-      plane.createCoupon(
+      await plane.setOfferEnabled('missing', true),
+      await plane.removeOffer('missing'),
+      await plane.createCoupon(
         code: 'CODE10',
         target: BillingOptionId.monthly,
         discount: const PercentageDiscount(10),
         assignment: const CouponAssignmentPublic(),
       ),
-      plane.updateCoupon(
+      await plane.updateCoupon(
         'missing',
         code: 'CODE10',
         target: BillingOptionId.monthly,
@@ -62,8 +62,8 @@ void main() {
         assignment: const CouponAssignmentPublic(),
         enabled: false,
       ),
-      plane.setCouponEnabled('missing', true),
-      plane.removeCoupon('missing'),
+      await plane.setCouponEnabled('missing', true),
+      await plane.removeCoupon('missing'),
     ];
     for (final result in results) {
       expect((result as Failure<Object?>).code, CommerceCodes.notAuthorized);
@@ -72,10 +72,10 @@ void main() {
     expect(scope.read(commerceControlPlaneProvider).coupons, before.coupons);
   });
 
-  test('offers create, edit, enable, disable and remove', () {
+  test('offers create, edit, enable, disable and remove', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
-    final created = plane.createOffer(
+    final created = await plane.createOffer(
       target: BillingOptionId.monthly,
       discount: const FixedFinalPriceDiscount(Money.cents(200)),
       title: ' عرض خاص ',
@@ -84,9 +84,9 @@ void main() {
     expect(created.data.title, 'عرض خاص');
     expect(created.data.enabled, isFalse);
 
-    expect(plane.setOfferEnabled(created.data.id, true, actor: actor).isSuccess,
+    expect((await plane.setOfferEnabled(created.data.id, true, actor: actor)).isSuccess,
         isTrue);
-    final edited = plane.updateOffer(
+    final edited = await plane.updateOffer(
       created.data.id,
       target: BillingOptionId.threeMonths,
       discount: const PercentageDiscount(20),
@@ -94,20 +94,20 @@ void main() {
       actor: actor,
     ) as Success<GlobalOffer>;
     expect(edited.data.target, BillingOptionId.threeMonths);
-    expect(plane.removeOffer(created.data.id, actor: actor).isSuccess, isTrue);
+    expect((await plane.removeOffer(created.data.id, actor: actor)).isSuccess, isTrue);
     expect(scope.read(commerceControlPlaneProvider).offers, isEmpty);
   });
 
-  test('a second live offer for one option is refused, not swapped', () {
+  test('a second live offer for one option is refused, not swapped', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
-    plane.createOffer(
+    await plane.createOffer(
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(10),
       enabled: true,
       actor: actor,
     );
-    final second = plane.createOffer(
+    final second = await plane.createOffer(
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(20),
       enabled: true,
@@ -117,10 +117,10 @@ void main() {
     expect(scope.read(commerceControlPlaneProvider).offers, hasLength(1));
   });
 
-  test('coupons normalize, edit, toggle and remove', () {
+  test('coupons normalize, edit, toggle and remove', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
-    final created = plane.createCoupon(
+    final created = await plane.createCoupon(
       code: ' team 20 ',
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(20),
@@ -131,9 +131,9 @@ void main() {
     expect(created.data.assignment, isA<CouponAssignmentAccount>());
 
     expect(
-        plane.setCouponEnabled(created.data.id, true, actor: actor).isSuccess,
+        (await plane.setCouponEnabled(created.data.id, true, actor: actor)).isSuccess,
         isTrue);
-    final edited = plane.updateCoupon(
+    final edited = await plane.updateCoupon(
       created.data.id,
       code: 'LEADER10',
       target: BillingOptionId.threeMonths,
@@ -145,21 +145,21 @@ void main() {
     ) as Success<Coupon>;
     expect(edited.data.code, 'LEADER10');
     expect(edited.data.note, 'internal');
-    expect(plane.removeCoupon(created.data.id, actor: actor).isSuccess, isTrue);
+    expect((await plane.removeCoupon(created.data.id, actor: actor)).isSuccess, isTrue);
     expect(scope.read(commerceControlPlaneProvider).coupons, isEmpty);
   });
 
-  test('duplicate and malformed coupon codes are refused', () {
+  test('duplicate and malformed coupon codes are refused', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
-    plane.createCoupon(
+    await plane.createCoupon(
       code: 'LEADER10',
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(10),
       assignment: const CouponAssignmentPublic(),
       actor: actor,
     );
-    final duplicate = plane.createCoupon(
+    final duplicate = await plane.createCoupon(
       code: ' leader 10 ',
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(10),
@@ -168,7 +168,7 @@ void main() {
     ) as Failure<Coupon>;
     expect(duplicate.code, CommerceCodes.couponCodeTaken);
 
-    final malformed = plane.createCoupon(
+    final malformed = await plane.createCoupon(
       code: '؟',
       target: BillingOptionId.monthly,
       discount: const PercentageDiscount(10),
@@ -178,17 +178,17 @@ void main() {
     expect(malformed.code, CommerceCodes.couponCodeInvalid);
   });
 
-  test('invalid targets and discounts never enter state', () {
+  test('invalid targets and discounts never enter state', () async {
     final scope = container(seed: empty);
     final plane = scope.read(commerceControlPlaneProvider.notifier);
-    final invalidOffer = plane.createOffer(
+    final invalidOffer = await plane.createOffer(
       target: BillingOptionId.sixMonths,
       discount: const PercentageDiscount(20),
       actor: actor,
     ) as Failure<GlobalOffer>;
     expect(invalidOffer.code, CommerceCodes.promotionInvalid);
 
-    final invalidCoupon = plane.createCoupon(
+    final invalidCoupon = await plane.createCoupon(
       code: 'FREE',
       target: BillingOptionId.monthly,
       discount: const FixedFinalPriceDiscount(Money.zero),

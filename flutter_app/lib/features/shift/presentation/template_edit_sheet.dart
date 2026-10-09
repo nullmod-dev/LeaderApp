@@ -9,6 +9,7 @@ import '../../../l10n/strings.dart';
 import '../data/shift_providers.dart';
 import '../domain/shift_models.dart';
 import 'repeat_days_picker.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Edit which days a saved template runs on.
 ///
@@ -169,7 +170,7 @@ class _TemplateEditBodyState extends ConsumerState<_TemplateEditBody> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

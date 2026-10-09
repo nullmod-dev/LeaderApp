@@ -1,14 +1,21 @@
-/// DEVELOPMENT AND TEST ONLY commercial control plane.
+/// The commercial control plane: global offers and coupons.
 ///
-/// State lives only in process memory. It is not production persistence,
-/// payment authority, coupon redemption, or subscription activation. A future
-/// backend adapter replaces this provider wholesale.
+/// **Two modes, one surface.** Without a backend (tests, the no-server build)
+/// state lives only in process memory, exactly as before. With one
+/// ([commerceBackendProvider]), this is a cache of what the server answered:
+/// it loads on build — every offer and coupon for a Super Admin, the live
+/// offers for everyone else — and every change is made on the server first
+/// and applied here from its reply. Neither mode is payment authority, coupon
+/// redemption or subscription activation.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/result/result.dart';
 import '../../../core/time/clock.dart';
+import '../../auth/data/auth_providers.dart';
+import '../../auth/domain/auth_models.dart';
+import 'commerce_backend.dart';
 import '../domain/billing_option.dart';
 import '../domain/coupon_code.dart';
 import '../domain/money.dart';
@@ -22,11 +29,31 @@ final class CommerceActor {
   final String displayName;
 }
 
+/// Where the control plane's state came from.
+enum CommercePhase {
+  /// In-memory development state; always "ready".
+  local,
+
+  /// A backend read is in flight and nothing has arrived yet.
+  loading,
+
+  /// The backend answered.
+  ready,
+
+  /// The backend read failed; [CommerceControlPlane.reload] tries again.
+  failed,
+}
+
 final class CommerceState {
-  const CommerceState({required this.offers, required this.coupons});
+  const CommerceState({
+    required this.offers,
+    required this.coupons,
+    this.phase = CommercePhase.local,
+  });
 
   final List<GlobalOffer> offers;
   final List<Coupon> coupons;
+  final CommercePhase phase;
 
   GlobalOffer? offerById(String id) {
     for (final offer in offers) {
@@ -59,10 +86,12 @@ final class CommerceState {
   CommerceState copyWith({
     List<GlobalOffer>? offers,
     List<Coupon>? coupons,
+    CommercePhase? phase,
   }) =>
       CommerceState(
         offers: offers ?? this.offers,
         coupons: coupons ?? this.coupons,
+        phase: phase ?? this.phase,
       );
 }
 
@@ -114,20 +143,121 @@ final commerceControlPlaneSeedProvider = Provider<CommerceState>((ref) {
 
 class CommerceControlPlane extends Notifier<CommerceState> {
   int _sequence = 0;
+  CommerceBackend? _backend;
+
+  /// A Super Admin manages every offer and coupon; everyone else sees only
+  /// the live offers (coupons are validated one code at a time).
+  bool _platform = false;
 
   @override
   CommerceState build() {
-    final seed = ref.watch(commerceControlPlaneSeedProvider);
-    return CommerceState(
-      offers: List.unmodifiable(seed.offers),
-      coupons: List.unmodifiable(seed.coupons),
+    _backend = ref.watch(commerceBackendProvider);
+    final backend = _backend;
+    if (backend == null) {
+      final seed = ref.watch(commerceControlPlaneSeedProvider);
+      return CommerceState(
+        offers: List.unmodifiable(seed.offers),
+        coupons: List.unmodifiable(seed.coupons),
+      );
+    }
+    final role =
+        ref.watch(currentUserProvider.select((u) => u.valueOrNull?.role));
+    _platform = role == AuthRole.superAdmin;
+    Future.microtask(reload);
+    return const CommerceState(
+      offers: [],
+      coupons: [],
+      phase: CommercePhase.loading,
     );
+  }
+
+  /// Reads the server again. A no-op without a backend.
+  Future<void> reload() async {
+    final backend = _backend;
+    if (backend == null) return;
+    if (state.phase == CommercePhase.failed) {
+      state = state.copyWith(phase: CommercePhase.loading);
+    }
+    if (_platform) {
+      final result = await backend.loadPlatform();
+      state = switch (result) {
+        Success(:final data) => data.copyWith(phase: CommercePhase.ready),
+        _ => state.copyWith(phase: CommercePhase.failed),
+      };
+    } else {
+      final result = await backend.loadActiveOffers();
+      state = switch (result) {
+        Success(:final data) => CommerceState(
+            offers: data,
+            coupons: const [],
+            phase: CommercePhase.ready,
+          ),
+        _ => state.copyWith(phase: CommercePhase.failed),
+      };
+    }
+  }
+
+  void _putOffer(GlobalOffer offer) {
+    final known = state.offers.any((o) => o.id == offer.id);
+    state = state.copyWith(
+      offers: List.unmodifiable(known
+          ? [for (final o in state.offers) o.id == offer.id ? offer : o]
+          : [offer, ...state.offers]),
+    );
+  }
+
+  void _putCoupon(Coupon coupon) {
+    final known = state.coupons.any((c) => c.id == coupon.id);
+    state = state.copyWith(
+      coupons: List.unmodifiable(known
+          ? [for (final c in state.coupons) c.id == coupon.id ? coupon : c]
+          : [coupon, ...state.coupons]),
+    );
+  }
+
+  /// The server's answer to a change, applied to the cache on success.
+  Future<Result<T>> _remote<T>(
+    Future<Result<T>> call,
+    void Function(T value) apply,
+  ) async {
+    final result = await call;
+    if (result case Success(:final data)) apply(data);
+    return result;
   }
 
   DateTime get _now => ref.read(clockProvider)().toUtc();
   List<BillingOption> get _catalog => ref.read(pricingCatalogProvider);
 
-  Result<GlobalOffer> createOffer({
+  Future<Result<GlobalOffer>> createOffer({
+    required BillingOptionId target,
+    required Discount discount,
+    bool enabled = false,
+    String? title,
+    DateTime? endsAt,
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localCreateOffer(
+          target: target,
+          discount: discount,
+          enabled: enabled,
+          title: title,
+          endsAt: endsAt,
+          actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(
+        backend.createOffer(
+            target: target,
+            discount: discount,
+            enabled: enabled,
+            title: title,
+            endsAt: endsAt),
+        _putOffer);
+  }
+
+  Result<GlobalOffer> _localCreateOffer({
     required BillingOptionId target,
     required Discount discount,
     bool enabled = false,
@@ -154,7 +284,37 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     return Success(offer);
   }
 
-  Result<GlobalOffer> updateOffer(
+  Future<Result<GlobalOffer>> updateOffer(
+    String id, {
+    required BillingOptionId target,
+    required Discount discount,
+    required bool enabled,
+    String? title,
+    DateTime? endsAt,
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localUpdateOffer(id,
+          target: target,
+          discount: discount,
+          enabled: enabled,
+          title: title,
+          endsAt: endsAt,
+          actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(
+        backend.updateOffer(id,
+            target: target,
+            discount: discount,
+            enabled: enabled,
+            title: title,
+            endsAt: endsAt),
+        _putOffer);
+  }
+
+  Result<GlobalOffer> _localUpdateOffer(
     String id, {
     required BillingOptionId target,
     required Discount discount,
@@ -191,7 +351,20 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     return Success(updated);
   }
 
-  Result<GlobalOffer> setOfferEnabled(
+  Future<Result<GlobalOffer>> setOfferEnabled(
+    String id,
+    bool enabled, {
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localSetOfferEnabled(id, enabled, actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(backend.setOfferEnabled(id, enabled), _putOffer);
+  }
+
+  Result<GlobalOffer> _localSetOfferEnabled(
     String id,
     bool enabled, {
     CommerceActor? actor,
@@ -204,7 +377,7 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     if (enabled && _hasOtherLiveOffer(existing.target, id)) {
       return const Failure('', code: CommerceCodes.offerConflict);
     }
-    return updateOffer(
+    return _localUpdateOffer(
       id,
       target: existing.target,
       discount: existing.discount,
@@ -215,7 +388,29 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     );
   }
 
-  Result<GlobalOffer> removeOffer(String id, {CommerceActor? actor}) {
+  Future<Result<GlobalOffer>> removeOffer(String id,
+      {CommerceActor? actor}) async {
+    final backend = _backend;
+    if (backend == null) return _localRemoveOffer(id, actor: actor);
+    if (actor == null) return _unauthorized();
+    final existing = state.offerById(id);
+    if (existing == null) {
+      return const Failure('', code: CommerceCodes.offerNotFound);
+    }
+    final result = await backend.removeOffer(id);
+    return switch (result) {
+      Success() => () {
+          state = state.copyWith(
+            offers: List.unmodifiable(state.offers.where((e) => e.id != id)),
+          );
+          return Success(existing);
+        }(),
+      Failure(:final message, :final code) => Failure(message, code: code),
+      Offline() => const Offline(),
+    };
+  }
+
+  Result<GlobalOffer> _localRemoveOffer(String id, {CommerceActor? actor}) {
     if (actor == null) return _unauthorized();
     final existing = state.offerById(id);
     if (existing == null) {
@@ -227,7 +422,42 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     return Success(existing);
   }
 
-  Result<Coupon> createCoupon({
+  Future<Result<Coupon>> createCoupon({
+    required String code,
+    required BillingOptionId target,
+    required Discount discount,
+    required CouponAssignment assignment,
+    bool enabled = false,
+    String? note,
+    DateTime? expiresAt,
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localCreateCoupon(
+          code: code,
+          target: target,
+          discount: discount,
+          assignment: assignment,
+          enabled: enabled,
+          note: note,
+          expiresAt: expiresAt,
+          actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(
+        backend.createCoupon(
+            code: code,
+            target: target,
+            discount: discount,
+            assignment: assignment,
+            enabled: enabled,
+            note: note,
+            expiresAt: expiresAt),
+        _putCoupon);
+  }
+
+  Result<Coupon> _localCreateCoupon({
     required String code,
     required BillingOptionId target,
     required Discount discount,
@@ -267,7 +497,43 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     return Success(coupon);
   }
 
-  Result<Coupon> updateCoupon(
+  Future<Result<Coupon>> updateCoupon(
+    String id, {
+    required String code,
+    required BillingOptionId target,
+    required Discount discount,
+    required CouponAssignment assignment,
+    required bool enabled,
+    String? note,
+    DateTime? expiresAt,
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localUpdateCoupon(id,
+          code: code,
+          target: target,
+          discount: discount,
+          assignment: assignment,
+          enabled: enabled,
+          note: note,
+          expiresAt: expiresAt,
+          actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(
+        backend.updateCoupon(id,
+            code: code,
+            target: target,
+            discount: discount,
+            assignment: assignment,
+            enabled: enabled,
+            note: note,
+            expiresAt: expiresAt),
+        _putCoupon);
+  }
+
+  Result<Coupon> _localUpdateCoupon(
     String id, {
     required String code,
     required BillingOptionId target,
@@ -317,7 +583,20 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     return Success(updated);
   }
 
-  Result<Coupon> setCouponEnabled(
+  Future<Result<Coupon>> setCouponEnabled(
+    String id,
+    bool enabled, {
+    CommerceActor? actor,
+  }) async {
+    final backend = _backend;
+    if (backend == null) {
+      return _localSetCouponEnabled(id, enabled, actor: actor);
+    }
+    if (actor == null) return _unauthorized();
+    return _remote(backend.setCouponEnabled(id, enabled), _putCoupon);
+  }
+
+  Result<Coupon> _localSetCouponEnabled(
     String id,
     bool enabled, {
     CommerceActor? actor,
@@ -327,7 +606,7 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     if (existing == null) {
       return const Failure('', code: CommerceCodes.couponNotFound);
     }
-    return updateCoupon(
+    return _localUpdateCoupon(
       id,
       code: existing.code,
       target: existing.target,
@@ -340,7 +619,28 @@ class CommerceControlPlane extends Notifier<CommerceState> {
     );
   }
 
-  Result<Coupon> removeCoupon(String id, {CommerceActor? actor}) {
+  Future<Result<Coupon>> removeCoupon(String id, {CommerceActor? actor}) async {
+    final backend = _backend;
+    if (backend == null) return _localRemoveCoupon(id, actor: actor);
+    if (actor == null) return _unauthorized();
+    final existing = state.couponById(id);
+    if (existing == null) {
+      return const Failure('', code: CommerceCodes.couponNotFound);
+    }
+    final result = await backend.removeCoupon(id);
+    return switch (result) {
+      Success() => () {
+          state = state.copyWith(
+            coupons: List.unmodifiable(state.coupons.where((e) => e.id != id)),
+          );
+          return Success(existing);
+        }(),
+      Failure(:final message, :final code) => Failure(message, code: code),
+      Offline() => const Offline(),
+    };
+  }
+
+  Result<Coupon> _localRemoveCoupon(String id, {CommerceActor? actor}) {
     if (actor == null) return _unauthorized();
     final existing = state.couponById(id);
     if (existing == null) {

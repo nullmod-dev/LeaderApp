@@ -17,6 +17,7 @@ import '../../../l10n/strings.dart';
 import '../../team/data/team_providers.dart';
 import '../../team/domain/team_models.dart';
 import '../data/detachment_providers.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Add (`memberId == null`) or edit one member of a detachment.
 ///
@@ -224,7 +225,7 @@ class _DetachmentMemberEditPageState
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -258,7 +259,7 @@ class _DetachmentMemberEditPageState
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

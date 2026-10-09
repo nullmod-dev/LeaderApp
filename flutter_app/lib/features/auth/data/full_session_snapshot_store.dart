@@ -15,11 +15,12 @@ class FullSessionSnapshot {
     required this.sessionId,
     required this.user,
     required this.access,
-    required this.signedInAt,
+    required this.lastServerContactAt,
   });
 
-  /// How long after [signedInAt] the copy may open the app offline — the
-  /// server's own absolute session lifetime.
+  /// How long after [lastServerContactAt] the copy may open the app offline
+  /// — the server's own idle limit (`REFRESH_TOKEN_TTL_DAYS`), which every
+  /// successful online read slides the same way.
   static const trustWindow = Duration(days: 7);
 
   /// The server session the copy was read under (`sessionId` from the
@@ -30,17 +31,18 @@ class FullSessionSnapshot {
   final AuthUser user;
   final SessionAccess access;
 
-  /// The first confirmed read of this session, in UTC. Kept across later
-  /// reads of the same session, so the window never slides.
-  final DateTime signedInAt;
+  /// The last successful `GET /auth/me` of this session, in UTC. Every
+  /// online read moves it forward; an offline open never does, so seven days
+  /// without the server are seven days however often the app is opened.
+  final DateTime lastServerContactAt;
 
   /// The instant the copy stops opening the app offline.
-  DateTime get trustEndsAt => signedInAt.add(trustWindow);
+  DateTime get trustEndsAt => lastServerContactAt.add(trustWindow);
 
-  /// Whether the copy may stand in for the server at [now]. A sign-in dated
+  /// Whether the copy may stand in for the server at [now]. A contact dated
   /// in the future (the clock was moved back) is not trusted either.
   bool trustedAt(DateTime now) {
-    final age = now.toUtc().difference(signedInAt);
+    final age = now.toUtc().difference(lastServerContactAt);
     return !age.isNegative && age < trustWindow;
   }
 
@@ -53,6 +55,11 @@ class FullSessionSnapshot {
 ///
 /// Best effort in both directions: a failed write only costs the offline
 /// copy, and a record that cannot be read is removed and reads as none.
+///
+/// Record version 2 names `lastServerContactAt`. A version 1 record (from the
+/// build that counted seven days from the sign-in) reads its `signedInAt` as
+/// the last contact — never later than the real one, so it only ever ends
+/// sooner, never later.
 class FullSessionSnapshotStore {
   FullSessionSnapshotStore(this._store);
 
@@ -70,12 +77,17 @@ class FullSessionSnapshotStore {
     if (raw == null) return null;
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+      final version =
+          decoded is Map<String, dynamic> ? decoded['version'] : null;
+      if (version != 1 && version != 2) {
         throw const FormatException('me snapshot version');
       }
+      decoded as Map<String, dynamic>;
       final sessionId = decoded['sessionId'];
-      final signedInAt = DateTime.parse(decoded['signedInAt'] as String);
-      if (sessionId is! String || sessionId.isEmpty || !signedInAt.isUtc) {
+      final contact = DateTime.parse(
+          decoded[version == 2 ? 'lastServerContactAt' : 'signedInAt']
+              as String);
+      if (sessionId is! String || sessionId.isEmpty || !contact.isUtc) {
         throw const FormatException('me snapshot fields');
       }
       return FullSessionSnapshot(
@@ -83,7 +95,7 @@ class FullSessionSnapshotStore {
         user: AuthUser.fromJson(decoded['user'] as Map<String, dynamic>),
         access:
             SessionAccess.fromJson(decoded['access'] as Map<String, dynamic>),
-        signedInAt: signedInAt,
+        lastServerContactAt: contact,
       );
     } on Object {
       // Never repaired or trusted, exactly like the credential records.
@@ -94,11 +106,12 @@ class FullSessionSnapshotStore {
 
   Future<void> write(FullSessionSnapshot snapshot) async {
     final encoded = jsonEncode({
-      'version': 1,
+      'version': 2,
       'sessionId': snapshot.sessionId,
       'user': snapshot.user.toJson(),
       'access': snapshot.access.toJson(),
-      'signedInAt': snapshot.signedInAt.toUtc().toIso8601String(),
+      'lastServerContactAt':
+          snapshot.lastServerContactAt.toUtc().toIso8601String(),
     });
     try {
       await _store.writeString(key, encoded);

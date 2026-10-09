@@ -126,8 +126,10 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, S.contactSupport));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('medical.team.auth@gmail.com'), findsOneWidget);
+      expect(find.byKey(const Key('support-sheet')), findsOneWidget);
+      expect(find.byKey(const Key('support-channel-whatsApp')), findsOneWidget);
+      expect(find.text('\u2066mtm.auth.teams@gmail.com\u2069'),
+          findsOneWidget);
       // Still the same screen underneath — no route was pushed.
       expect(find.text(S.accountRevokedTitle), findsOneWidget);
     });

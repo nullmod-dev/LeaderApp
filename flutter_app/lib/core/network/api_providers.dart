@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/app_version/data/app_version_providers.dart';
 import '../../features/auth/data/auth_providers.dart';
+import '../../features/auth/data/device_id_store.dart';
 import '../../features/auth/data/http_auth_repository.dart';
 import 'api_client.dart';
 import 'token_vault.dart';
@@ -14,7 +15,7 @@ import 'token_vault.dart';
 final apiClientProvider = Provider<ApiClient>((ref) {
   final client = ApiClient(
     vault: TokenVault(ref.watch(authStateStoreProvider)),
-  );
+  )..deviceId = ref.watch(deviceIdStoreProvider).read;
 
   // Any 426 sends the forced-upgrade gate back to the server once; repeated
   // 426s while that check runs do not queue more checks.

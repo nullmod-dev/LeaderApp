@@ -1,4 +1,4 @@
-/// Platform authorization boundary for local commerce controls.
+/// Platform authorization boundary for the commerce controls.
 ///
 /// A visible role label is never authority. Only an authenticated Super Admin
 /// can produce a [CommerceActor], and every control-plane mutation still
@@ -29,7 +29,7 @@ class PlatformCommerceActions {
       _ref.read(commerceControlPlaneProvider.notifier);
   CommerceActor? get _actor => _ref.read(platformCommerceActorProvider);
 
-  Result<GlobalOffer> createOffer({
+  Future<Result<GlobalOffer>> createOffer({
     required BillingOptionId target,
     required Discount discount,
     required bool enabled,
@@ -43,7 +43,7 @@ class PlatformCommerceActions {
         actor: _actor,
       );
 
-  Result<GlobalOffer> updateOffer(
+  Future<Result<GlobalOffer>> updateOffer(
     String id, {
     required BillingOptionId target,
     required Discount discount,
@@ -59,13 +59,13 @@ class PlatformCommerceActions {
         actor: _actor,
       );
 
-  Result<GlobalOffer> setOfferEnabled(String id, bool enabled) =>
+  Future<Result<GlobalOffer>> setOfferEnabled(String id, bool enabled) =>
       _plane.setOfferEnabled(id, enabled, actor: _actor);
 
-  Result<GlobalOffer> removeOffer(String id) =>
+  Future<Result<GlobalOffer>> removeOffer(String id) =>
       _plane.removeOffer(id, actor: _actor);
 
-  Result<Coupon> createCoupon({
+  Future<Result<Coupon>> createCoupon({
     required String code,
     required BillingOptionId target,
     required Discount discount,
@@ -83,7 +83,7 @@ class PlatformCommerceActions {
         actor: _actor,
       );
 
-  Result<Coupon> updateCoupon(
+  Future<Result<Coupon>> updateCoupon(
     String id, {
     required String code,
     required BillingOptionId target,
@@ -103,10 +103,10 @@ class PlatformCommerceActions {
         actor: _actor,
       );
 
-  Result<Coupon> setCouponEnabled(String id, bool enabled) =>
+  Future<Result<Coupon>> setCouponEnabled(String id, bool enabled) =>
       _plane.setCouponEnabled(id, enabled, actor: _actor);
 
-  Result<Coupon> removeCoupon(String id) =>
+  Future<Result<Coupon>> removeCoupon(String id) =>
       _plane.removeCoupon(id, actor: _actor);
 }
 

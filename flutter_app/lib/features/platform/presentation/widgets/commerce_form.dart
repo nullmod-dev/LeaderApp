@@ -180,7 +180,8 @@ class CommerceFormActions extends StatelessWidget {
   });
 
   final Key saveKey;
-  final VoidCallback onSave;
+  /// `null` while a save is in flight: the button disables itself.
+  final VoidCallback? onSave;
   final VoidCallback onCancel;
 
   @override

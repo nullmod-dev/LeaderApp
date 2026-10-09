@@ -165,7 +165,7 @@ class _MarkAllReadActionState extends ConsumerState<_MarkAllReadAction> {
       failure: (message, _) =>
           messenger.showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => messenger.showSnackBar(
-        const SnackBar(content: Text(S.offlineTitle)),
+        actionNeedsConnectionSnackBar,
       ),
     );
   }
@@ -262,7 +262,7 @@ class _ClearHistoryActionState extends ConsumerState<_ClearHistoryAction> {
       failure: (message, _) =>
           messenger.showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => messenger.showSnackBar(
-        const SnackBar(content: Text(S.offlineTitle)),
+        actionNeedsConnectionSnackBar,
       ),
     );
   }
@@ -422,7 +422,7 @@ class _FeedState extends ConsumerState<_Feed> {
         failure: (message, _) => ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message))),
         offline: (_) => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(S.offlineTitle)),
+          actionNeedsConnectionSnackBar,
         ),
       );
       if (!mounted) return;

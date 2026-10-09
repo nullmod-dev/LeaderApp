@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,8 @@ import '../../../core/motion/motion_tokens.dart';
 import '../../../core/startup/intro_gate.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../l10n/strings.dart';
+import '../data/auth_providers.dart';
+import '../data/http_auth_repository.dart';
 import 'entry_glass.dart';
 
 /// The Leader launch experience — what a cold start of the app looks like.
@@ -57,6 +60,11 @@ import 'entry_glass.dart';
 ///   [_captionDelay] more it says so in words, with the same live-region
 ///   sentence the old startup surface used. A launch that is quick never
 ///   shows that line at all, which is the point of the delay.
+/// * **the server is slow** — only a backend build reads the session over the
+///   network (`GET /auth/me`, up to two 20 s requests). [slowNetworkAfter]
+///   from the first frame, still here, the caption becomes the reason: the
+///   connection is slow, and the stored copy opens if the server never
+///   answers.
 class LeaderIntro extends ConsumerStatefulWidget {
   const LeaderIntro({super.key});
 
@@ -69,6 +77,9 @@ class LeaderIntro extends ConsumerStatefulWidget {
   /// working. Only ever seen on a slow boot.
   static const Duration _captionDelay = Duration(milliseconds: 600);
 
+  /// How long a backend launch waits on the server before saying why.
+  static const Duration slowNetworkAfter = Duration(seconds: 3);
+
   @override
   ConsumerState<LeaderIntro> createState() => _LeaderIntroState();
 }
@@ -77,7 +88,9 @@ class _LeaderIntroState extends ConsumerState<LeaderIntro>
     with SingleTickerProviderStateMixin {
   AnimationController? _entrance;
   Timer? _caption;
+  Timer? _slowTimer;
   bool _showCaption = false;
+  bool _slow = false;
   bool _started = false;
 
   @override
@@ -85,6 +98,17 @@ class _LeaderIntroState extends ConsumerState<LeaderIntro>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
+    // A local restore never waits on a network; only the backend build's
+    // session read can be slow for a reason worth naming.
+    if (ref.read(authRepositoryProvider) is HttpAuthRepository) {
+      _slowTimer = Timer(LeaderIntro.slowNetworkAfter, () {
+        if (!mounted) return;
+        setState(() {
+          _slow = true;
+          _showCaption = true;
+        });
+      });
+    }
     // Read, not watched: whether this launch plays an entrance is decided
     // once, on the frame the screen appears. The gate moving to `done`
     // underneath it must not restart or cancel anything.
@@ -141,6 +165,7 @@ class _LeaderIntroState extends ConsumerState<LeaderIntro>
   @override
   void dispose() {
     _caption?.cancel();
+    _slowTimer?.cancel();
     _entrance?.dispose();
     super.dispose();
   }
@@ -242,25 +267,54 @@ class _LeaderIntroState extends ConsumerState<LeaderIntro>
             ),
           ),
         ),
-        // Reserved whatever the caption is doing, so revealing it cannot move
-        // the mark that is already on screen.
+        // Reserved whatever the caption is doing — two lines at the current
+        // text scale, the most the slow-network sentence takes — so revealing
+        // or swapping it cannot move the mark that is already on screen.
         SizedBox(
-          height: 64,
+          height: math.max(
+            64,
+            26 + 2 * MediaQuery.textScalerOf(context).scale(13) * 1.5 + 2,
+          ),
           child: AnimatedOpacity(
             opacity: _showCaption ? 1 : 0,
             duration: effectiveDuration(context, MotionTokens.medium),
             curve: effectiveCurve(context, MotionTokens.standard),
             child: Padding(
               padding: const EdgeInsets.only(top: 26),
-              child: Semantics(
-                liveRegion: _showCaption,
-                child: Text(
-                  S.startupRestoring,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: glass.faint,
-                    fontSize: 13,
-                    height: 1.5,
+              child: AnimatedSwitcher(
+                duration: effectiveDuration(context, MotionTokens.short),
+                switchInCurve: effectiveCurve(context, MotionTokens.enter),
+                switchOutCurve: effectiveCurve(context, MotionTokens.exit),
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [...previous, if (current != null) current],
+                ),
+                // The new sentence fades in and rises 4 dp; vertical only, so
+                // there is nothing to mirror under RTL.
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.2),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: Semantics(
+                  key: ValueKey(_slow),
+                  liveRegion: _showCaption,
+                  child: Text(
+                    _slow ? S.startupSlowNetwork : S.startupRestoring,
+                    key: const Key('startup-caption'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: glass.faint,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
                   ),
                 ),
               ),

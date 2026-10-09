@@ -1,3 +1,4 @@
+import '../../../core/access/saas_tenant_status.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/result/result.dart';
 import '../domain/platform_break_glass_models.dart';
@@ -17,12 +18,19 @@ class HttpPlatformBreakGlassRepository implements PlatformBreakGlassRepository {
         '/platform/break-glass/current',
         parse: (json) {
           final j = json as Map<String, dynamic>;
-          final grant = j['grant'];
+          final raw = j['grant'];
+          final grant =
+              raw is Map<String, dynamic> ? BreakGlassGrant.fromJson(raw) : null;
           return BreakGlassSnapshot(
-            grant: grant is Map<String, dynamic>
-                ? BreakGlassGrant.fromJson(grant)
-                : null,
+            grant: grant,
             readAt: DateTime.parse(j['readAt'] as String).toUtc(),
+            // The server ends a grant whose team is no longer active before
+            // it answers, so an active grant here vouches for its team. The
+            // local tenant catalogue holds fixtures in this build and knows
+            // nothing about real teams.
+            targetTenantStatus: grant?.status == BreakGlassGrantStatus.active
+                ? SaasTenantStatus.active
+                : null,
           );
         },
       );

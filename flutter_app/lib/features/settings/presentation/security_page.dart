@@ -15,11 +15,14 @@ import '../../../core/widgets/refresh_indicator.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/status_chip.dart';
 import '../../../l10n/strings.dart';
+import '../../../core/time/clock.dart';
 import '../../auth/data/auth_providers.dart';
+import '../../auth/data/http_auth_repository.dart';
 import '../../auth/data/session_revoke_controller.dart';
 import '../../auth/data/sign_out_controller.dart';
 import '../../auth/presentation/sign_out_action.dart';
 import '../../auth/domain/auth_models.dart';
+import '../../auth/presentation/device_trust_copy.dart';
 import '../../shell/main_shell.dart';
 import 'widgets/settings_widgets.dart';
 
@@ -94,6 +97,23 @@ class SecurityPage extends ConsumerWidget {
                   subtitle: S.profilePasswordResetSub,
                   onTap: () => context.push('/forgot'),
                 ),
+                // Device trust: the devices that sign in without a code.
+                // The same screen sits under this one on both surfaces.
+                NavigationRow(
+                  key: const Key('security-devices-row'),
+                  icon: Icons.devices_outlined,
+                  label: S.myDevicesTitle,
+                  subtitle: S.myDevicesSub,
+                  onTap: () => context
+                      .push('${GoRouterState.of(context).uri.path}/devices'),
+                ),
+                if (_offlineAccess(ref) case final value?)
+                  _InfoRow(
+                    key: const Key('security-offline-row'),
+                    icon: Icons.cloud_off_outlined,
+                    label: S.securityOfflineAccess,
+                    value: value,
+                  ),
               ]),
               const _Caption(S.securityMfaNote),
 
@@ -124,6 +144,22 @@ class SecurityPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// How long this phone still opens the account offline: seven days after
+  /// its last server contact (`HttpAuthRepository.offlineTrustEndsAt`).
+  /// `null` — no row — when the build keeps no offline copy.
+  String? _offlineAccess(WidgetRef ref) {
+    // Re-read whenever the session is: every online read moves the date.
+    ref.watch(currentUserResultProvider);
+    final repository = ref.watch(authRepositoryProvider);
+    if (repository is! HttpAuthRepository) return null;
+    final endsAt = repository.offlineTrustEndsAt;
+    final now = ref.watch(clockProvider)().toUtc();
+    if (endsAt == null || !endsAt.isAfter(now)) return S.offlineAccessEnded;
+    return S.offlineAccessUntil
+        .replaceFirst('%s', DeviceTrustCopy.moment(endsAt))
+        .replaceFirst('%s', DeviceTrustCopy.days(endsAt.difference(now)));
   }
 
   /// The session section's own four states, as list children.
@@ -344,6 +380,38 @@ class _StatusRow extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      minVerticalPadding: AppSpacing.md,
+    );
+  }
+}
+
+/// A settings row that states a fact and goes nowhere.
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return ListTile(
+      leading: Icon(icon, color: c.ink2),
+      title: Text(label),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.xs),
+        child: Text(value, style: TextStyle(color: c.ink2, fontSize: 13)),
       ),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,

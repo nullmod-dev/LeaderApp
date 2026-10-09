@@ -7,6 +7,7 @@ import '../domain/billing_option.dart';
 import '../domain/coupon_validation.dart';
 import '../domain/price_quote.dart';
 import '../domain/promotion.dart';
+import 'commerce_backend.dart';
 import 'commerce_control_plane.dart';
 import 'pricing_catalog.dart';
 
@@ -64,15 +65,23 @@ class CouponEntry extends Notifier<CouponEntryState> {
     // Preserve an observable validating frame. The future backend adapter will
     // naturally occupy this seam without changing the widget state machine.
     await Future<void>.delayed(Duration.zero);
-    final user = ref.read(currentUserProvider).valueOrNull;
-    final result = validateCoupon(
-      coupons: ref.read(commerceControlPlaneProvider).coupons,
-      catalog: ref.read(pricingCatalogProvider),
-      rawCode: state.input,
-      accountId: user?.id ?? '',
-      selectedOption: ref.read(selectedBillingOptionProvider),
-      now: ref.read(clockProvider)(),
-    );
+    final backend = ref.read(commerceBackendProvider);
+    final Result<CouponResolution> result;
+    if (backend != null) {
+      // The server judges the code: assignment, expiry, uses and price.
+      result = await backend.validateCoupon(
+          state.input, ref.read(selectedBillingOptionProvider));
+    } else {
+      final user = ref.read(currentUserProvider).valueOrNull;
+      result = validateCoupon(
+        coupons: ref.read(commerceControlPlaneProvider).coupons,
+        catalog: ref.read(pricingCatalogProvider),
+        rawCode: state.input,
+        accountId: user?.id ?? '',
+        selectedOption: ref.read(selectedBillingOptionProvider),
+        now: ref.read(clockProvider)(),
+      );
+    }
     state = state.copyWith(phase: CouponPhase.done, last: result);
   }
 }

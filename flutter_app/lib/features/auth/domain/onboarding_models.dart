@@ -255,12 +255,20 @@ enum VerificationPurpose {
 
   /// A returning account signing in with Google: the backend mails a code to
   /// the account's address before it opens the session (wire `sign_in`).
-  signIn;
+  signIn,
+
+  /// A sign-in from a device this account does not trust yet — or its very
+  /// first device: the code proves the mailbox before the session opens on
+  /// this phone (wire `new_device`).
+  newDevice;
 
   /// An absent or unknown value reads as [emailOwnership] — the screen the
   /// challenge always had.
-  static VerificationPurpose parse(Object? raw) =>
-      raw == 'sign_in' ? VerificationPurpose.signIn : emailOwnership;
+  static VerificationPurpose parse(Object? raw) => switch (raw) {
+        'sign_in' => VerificationPurpose.signIn,
+        'new_device' => VerificationPurpose.newDevice,
+        _ => emailOwnership,
+      };
 }
 
 /// A backend-issued email-ownership challenge. **Not a session.**
@@ -388,6 +396,7 @@ class VerificationChallenge {
           'resendAvailableAt': resendAvailableAt!.toIso8601String(),
         if (attemptsRemaining != null) 'attemptsRemaining': attemptsRemaining,
         if (purpose == VerificationPurpose.signIn) 'purpose': 'sign_in',
+        if (purpose == VerificationPurpose.newDevice) 'purpose': 'new_device',
       };
 
   @override

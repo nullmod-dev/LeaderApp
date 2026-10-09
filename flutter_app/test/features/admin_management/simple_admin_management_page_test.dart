@@ -228,6 +228,111 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('detachment scope', () {
+    test('mirrors the server: workshop keys stay team-wide', () {
+      final grant = simpleAdminGrant(
+          {Cap.detachmentView, Cap.shiftManage, Cap.workshopEdit},
+          {'d_homs', 'd_coast'});
+      expect(grant.global, {Cap.workshopEdit});
+      expect(grant.scoped.keys, unorderedEquals(['d_homs', 'd_coast']));
+      expect(grant.scoped['d_homs'], {Cap.detachmentView, Cap.shiftManage});
+
+      final wide = simpleAdminGrant({Cap.detachmentView, Cap.workshopEdit}, {});
+      expect(wide.global, {Cap.detachmentView, Cap.workshopEdit});
+      expect(wide.scoped, isEmpty);
+    });
+
+    test('a stored grant opens with every key it holds', () {
+      final form = simpleAdminFormOf(Capabilities(
+        global: {Cap.workshopEdit},
+        scoped: {
+          'd_homs': {Cap.detachmentView},
+          'd_coast': {Cap.detachmentView, Cap.shiftManage},
+        },
+      ));
+      expect(form.keys, {Cap.workshopEdit, Cap.detachmentView, Cap.shiftManage});
+      expect(form.detachmentIds, {'d_homs', 'd_coast'});
+      expect(
+          simpleAdminFormOf(const Capabilities(global: {Cap.memberView}))
+              .detachmentIds,
+          isEmpty);
+    });
+
+    testWidgets('an invitation can be limited to chosen detachments',
+        (tester) async {
+      final (store, _) =
+          await _pumpForm(tester, now, const SimpleAdminInvitePage());
+      await tester.enterText(
+          find.byKey(const Key('simple-admin-name')), 'مدير حمص');
+      await tester.enterText(
+          find.byKey(const Key('simple-admin-email')), 'homs@example.org');
+
+      await _tapVisible(tester, find.byKey(const Key('simple-admin-scope-some')));
+      // Chosen, but nothing chosen yet: refused, and said.
+      await _tapVisible(
+          tester, find.byKey(const Key('simple-admin-send-invitation')));
+      expect(find.byKey(const Key('simple-admin-scope-required')),
+          findsOneWidget);
+      expect(store.invitations.values.where((i) => i.email == 'homs@example.org'),
+          isEmpty);
+
+      await _tapVisible(
+          tester, find.byKey(const Key('scope-detachment-d_homs')));
+      await _tapVisible(
+          tester, find.byKey(const Key('simple-admin-send-invitation')));
+
+      final invitation = store.invitations.values
+          .singleWhere((i) => i.email == 'homs@example.org');
+      expect(invitation.capabilities.scoped.keys, ['d_homs']);
+      expect(invitation.capabilities.scoped['d_homs'],
+          contains(Cap.detachmentView));
+      expect(invitation.capabilities.global.every(Cap.global.contains), isTrue,
+          reason: 'only organisation-level keys are team-wide');
+    });
+
+    testWidgets('editing a scoped account keeps its detachments',
+        (tester) async {
+      final store = SimpleAdminStore.seeded(now);
+      final account = store.accounts['u_demo_simple']!;
+      store.accounts['u_demo_simple'] = account.copyWith(
+        capabilities: simpleAdminGrant(
+            {Cap.detachmentView, Cap.memberView}, {'d_coast'}),
+      );
+      await _pumpForm(tester, now,
+          const SimpleAdminCapabilitiesPage(accountId: 'u_demo_simple'),
+          seeded: store);
+
+      // Opens as it is: the keys checked, "chosen" selected, d_coast ticked.
+      expect(
+          tester
+              .widget<CheckboxListTile>(
+                  find.byKey(const Key('capability-detachment.view')))
+              .value,
+          isTrue);
+      expect(
+          tester
+              .widget<ChoiceChip>(
+                  find.byKey(const Key('simple-admin-scope-some')))
+              .selected,
+          isTrue);
+      expect(
+          tester
+              .widget<CheckboxListTile>(
+                  find.byKey(const Key('scope-detachment-d_coast')))
+              .value,
+          isTrue);
+
+      await _tapVisible(
+          tester, find.byKey(const Key('scope-detachment-d_homs')));
+      await _tapVisible(
+          tester, find.byKey(const Key('simple-admin-save-capabilities')));
+
+      final saved = store.accounts['u_demo_simple']!.capabilities;
+      expect(saved.scoped.keys, unorderedEquals(['d_coast', 'd_homs']));
+      expect(saved.global, isEmpty, reason: 'nothing became team-wide');
+    });
+  });
+
   testWidgets(
       'Point 18B: the grouped capability editor fits 320dp at 1.6x text',
       (tester) async {
@@ -240,6 +345,56 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+Future<(SimpleAdminStore, ProviderContainer)> _pumpForm(
+  WidgetTester tester,
+  DateTime now,
+  Widget home, {
+  SimpleAdminStore? seeded,
+}) async {
+  tester.view.physicalSize = const Size(390, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final store = seeded ?? SimpleAdminStore.seeded(now);
+  final container = ProviderContainer(overrides: [
+    currentUserProvider.overrideWith((ref) async => _mainAdmin),
+    clockProvider.overrideWithValue(() => now),
+    simpleAdminStoreProvider.overrideWithValue(store),
+  ]);
+  addTearDown(container.dispose);
+  final router = GoRouter(
+    initialLocation: '/form',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const SizedBox(),
+        routes: [GoRoute(path: 'form', builder: (_, __) => home)],
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(UncontrolledProviderScope(
+    container: container,
+    child: MaterialApp.router(
+      theme: AppTheme.light(PaletteId.medical),
+      routerConfig: router,
+      builder: (context, child) =>
+          Directionality(textDirection: TextDirection.rtl, child: child!),
+    ),
+  ));
+  await tester.pumpAndSettle();
+  return (store, container);
+}
+
+Future<void> _tapVisible(WidgetTester tester, Finder target) async {
+  // The form is a lazy ListView: the scope section is built only once it is
+  // scrolled near.
+  await tester.scrollUntilVisible(target, 300,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pumpAndSettle();
+  await tester.tap(target);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpCapabilities320(WidgetTester tester, DateTime now) async {

@@ -264,7 +264,7 @@ class MockAuthRepository implements AuthRepository {
         // A vault failure is not evidence of sign-out and never becomes a
         // locally invented user. The auth gate remains unresolved.
         _restored = false;
-        return const Failure('', code: 'server');
+        return const Failure('', code: AuthRepository.deviceStorageCode);
       }
     }
     return Success(_me);
@@ -344,12 +344,6 @@ class MockAuthRepository implements AuthRepository {
     if (password.length < 8) {
       return const Failure('٨ أحرف على الأقل.');
     }
-    return const Success(null);
-  }
-
-  @override
-  Future<Result<void>> confirmNewDevice({required bool itsMe}) async {
-    await _latency();
     return const Success(null);
   }
 

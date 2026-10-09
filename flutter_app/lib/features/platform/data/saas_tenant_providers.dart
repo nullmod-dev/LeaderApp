@@ -51,6 +51,13 @@ final saasTenantDetailProvider = FutureProvider.autoDispose
 /// too easy for full-resource fields to leak onto the deleted presentation.
 final deletedTenantTombstoneProvider = Provider.autoDispose
     .family<DeletedTenantTombstone?, String>((ref, tenantId) {
+  final repository = ref.watch(saasTenantRepositoryProvider);
+  if (repository is TenantTombstoneSource) {
+    // The backend build learns a tombstone from the detail read itself, so
+    // the answer is re-asked whenever that read lands.
+    ref.watch(saasTenantDetailProvider(tenantId));
+    return (repository as TenantTombstoneSource).tombstoneOf(tenantId);
+  }
   return ref.watch(platformTenantStoreProvider).tombstoneById(tenantId);
 });
 

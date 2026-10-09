@@ -17,6 +17,7 @@ import '../data/platform_commerce_providers.dart';
 import 'platform_commerce_copy.dart';
 import 'widgets/commerce_form.dart';
 import 'widgets/platform_page.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Create or edit one coupon.
 ///
@@ -46,6 +47,9 @@ class _PlatformCouponEditPageState
   var _public = true;
   var _enabled = false;
   var _initialized = false;
+
+  /// A save is with the server; a second tap must not send it twice.
+  var _saving = false;
 
   @override
   void initState() {
@@ -217,7 +221,7 @@ class _PlatformCouponEditPageState
                 const SizedBox(height: AppSpacing.xl),
                 CommerceFormActions(
                   saveKey: const Key('platform-coupon-save'),
-                  onSave: _save,
+                  onSave: _saving ? null : _save,
                   onCancel: () => context.pop(),
                 ),
               ],
@@ -238,15 +242,16 @@ class _PlatformCouponEditPageState
     return price == null ? null : FixedFinalPriceDiscount(price);
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
     final assignment = _public
         ? const CouponAssignmentPublic()
         : CouponAssignmentAccount(_account.text.trim());
     final actions = ref.read(platformCommerceActionsProvider);
+    setState(() => _saving = true);
     final Result<Coupon> result;
     if (widget.couponId == null) {
-      result = actions.createCoupon(
+      result = await actions.createCoupon(
         code: _code.text,
         target: _target,
         discount: _discount()!,
@@ -255,7 +260,7 @@ class _PlatformCouponEditPageState
         note: _note.text,
       );
     } else {
-      result = actions.updateCoupon(
+      result = await actions.updateCoupon(
         widget.couponId!,
         code: _code.text,
         target: _target,
@@ -265,6 +270,8 @@ class _PlatformCouponEditPageState
         note: _note.text,
       );
     }
+    if (!mounted) return;
+    setState(() => _saving = false);
     result.when(
       success: (_, {stale = false}) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -279,7 +286,8 @@ class _PlatformCouponEditPageState
               : S.platformCommerceInvalid),
         ),
       ),
-      offline: (_) {},
+      offline: (_) => ScaffoldMessenger.of(context)
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

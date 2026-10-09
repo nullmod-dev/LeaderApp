@@ -20,6 +20,7 @@ import '../../../core/widgets/section_header.dart';
 import '../../../l10n/strings.dart';
 import '../data/report_builder.dart';
 import '../domain/report_models.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Build a report: choose the sections, the span, and the format.
 ///
@@ -222,7 +223,7 @@ class _Actions extends ConsumerWidget {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

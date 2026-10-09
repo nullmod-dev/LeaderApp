@@ -576,7 +576,7 @@ class _BulkActionsState extends ConsumerState<_BulkActions> {
       success: (added, {stale = false}) =>
           _say(added == 0 ? S.copyPreviousDayEmpty : S.copyPreviousDayDone),
       failure: (message, _) => _say(message),
-      offline: (_) => _say(S.offlineTitle),
+      offline: (_) => _say(S.actionNeedsConnection),
     );
   }
 

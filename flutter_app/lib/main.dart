@@ -15,7 +15,8 @@ import 'core/sync/sync_scheduler.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/data/app_lock_controller.dart';
-import 'features/auth/data/auth_providers.dart' show localStoreProvider;
+import 'features/auth/data/auth_providers.dart'
+    show currentUserResultProvider, localStoreProvider;
 import 'features/auth/data/onboarding_controller.dart';
 import 'features/auth/presentation/app_lock_gate.dart';
 import 'features/conflict/data/conflict_review_recording.dart';
@@ -97,6 +98,9 @@ class MtmApp extends ConsumerStatefulWidget {
 }
 
 class _MtmAppState extends ConsumerState<MtmApp> with WidgetsBindingObserver {
+  /// When the app last re-read the session on coming back to the front.
+  DateTime? _sessionReadOnResume;
+
   @override
   void initState() {
     super.initState();
@@ -132,7 +136,22 @@ class _MtmAppState extends ConsumerState<MtmApp> with WidgetsBindingObserver {
       ref.read(appLockControllerProvider.notifier).onResumed();
       _applyAndroidSystemUi();
       ref.read(syncSchedulerProvider).onAppResumed();
+      _rereadSession();
     }
+  }
+
+  /// Device trust: coming back to the app re-reads `GET /auth/me` (at most
+  /// once a minute), so a trusted phone sees "a new device signed in" and a
+  /// new phone sees its restriction lift without a cold launch. The previous
+  /// value stays visible while it reloads; offline answers from the copy.
+  void _rereadSession() {
+    final now = DateTime.now();
+    final last = _sessionReadOnResume;
+    if (last != null && now.difference(last) < const Duration(minutes: 1)) {
+      return;
+    }
+    _sessionReadOnResume = now;
+    ref.invalidate(currentUserResultProvider);
   }
 
   @override

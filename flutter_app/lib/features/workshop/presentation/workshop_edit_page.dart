@@ -15,6 +15,7 @@ import '../../../l10n/strings.dart';
 import '../data/workshop_providers.dart';
 import '../domain/workshop_models.dart';
 import 'workshop_list_page.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Create (`id == null`) or edit a workshop. Both acts are organisation-level.
 class WorkshopEditPage extends ConsumerStatefulWidget {
@@ -287,7 +288,7 @@ class _WorkshopEditPageState extends ConsumerState<WorkshopEditPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

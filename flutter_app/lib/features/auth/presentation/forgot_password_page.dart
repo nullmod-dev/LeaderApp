@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
+import '../data/auth_entry_email_provider.dart';
 import '../data/auth_providers.dart';
 import '_auth_scaffold.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -26,20 +28,23 @@ class _S extends ConsumerState<ForgotPasswordPage> {
 
   Future<void> _submit() async {
     setState(() => _busy = true);
-    final r = await ref
-        .read(authRepositoryProvider)
-        .requestPasswordReset(_email.text);
+    final email = _email.text.trim();
+    final r = await ref.read(authRepositoryProvider).requestPasswordReset(email);
     if (!mounted) return;
     setState(() => _busy = false);
     r.when(
-      success: (_, {stale = false}) => context.push('/otp'),
+      success: (_, {stale = false}) {
+        // `/otp` names this address and verifies the code against it.
+        ref.read(passwordResetEmailProvider.notifier).state = email;
+        context.push('/otp');
+      },
       // Never render backend text here: it can reveal whether the address
       // exists or which provider owns it. Only a generic service failure is
       // safe before authentication.
       failure: (_, __) => ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(S.onboardingTemporaryFailure))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 

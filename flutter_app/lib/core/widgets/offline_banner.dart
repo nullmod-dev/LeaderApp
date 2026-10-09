@@ -1,63 +1,88 @@
 import 'package:flutter/material.dart';
 
-import '../motion/animated_counter.dart';
 import '../motion/motion_tokens.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
-import '../theme/app_typography.dart';
 import '../../l10n/strings.dart';
 
-/// Slim banner pinned under the app bar; only visible when [visible] is true.
+/// The one sentence every action that needs the server says when the phone
+/// is offline. Shared so thirty call sites cannot drift into thirty wordings,
+/// and so none of them falls back to a bare «بدون اتصال» that names the
+/// state without saying what it stopped.
+const SnackBar actionNeedsConnectionSnackBar =
+    SnackBar(content: Text(S.actionNeedsConnection));
+
+/// The offline bar at the top of a shell: the app is running on the stored
+/// copy of the account, not on the server.
+///
+/// It owns the status-bar inset while it shows (the same contract as the
+/// device-trust bar), and opens and closes by [AnimatedSize] only — it never
+/// slides across the screen. [detail] is the second line, used for the last
+/// 48 hours of the offline window.
 class OfflineBanner extends StatelessWidget {
-  const OfflineBanner({
-    super.key,
-    required this.visible,
-    required this.lastRefreshedAgoMinutes,
-  });
+  const OfflineBanner({super.key, required this.visible, this.detail});
 
   final bool visible;
-  final int lastRefreshedAgoMinutes;
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final detail = this.detail;
     return AnimatedSize(
       alignment: Alignment.topCenter,
       duration: effectiveDuration(context, MotionTokens.short),
       curve: effectiveCurve(context, MotionTokens.enter),
       child: !visible
-          ? const SizedBox.shrink()
-          : Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
-              ),
+          ? const SizedBox(width: double.infinity)
+          : Material(
               color: c.warnTint,
-              child: Row(children: [
-                Icon(Icons.cloud_off_rounded, size: 16, color: c.warn),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                        text: '${S.offlineTitle} · ',
-                        style: TextStyle(
-                            color: c.warn, fontWeight: FontWeight.w600),
-                      ),
-                      TextSpan(
-                        text: S.offlineSub,
-                        style: TextStyle(color: c.ink2),
-                      ),
-                      TextSpan(
-                        text:
-                            '${toArabicIndic(lastRefreshedAgoMinutes.toString())} د',
-                        style: AppTypography.digits(c.ink),
-                      ),
-                    ]),
+              child: Semantics(
+                key: const Key('offline-banner'),
+                container: true,
+                liveRegion: true,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                        AppSpacing.lg, AppSpacing.sm, AppSpacing.lg,
+                        AppSpacing.sm),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.cloud_off_rounded, size: 18, color: c.warn),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                S.offlineCopyBanner,
+                                style: TextStyle(
+                                  color: c.ink2,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (detail != null)
+                                Text(
+                                  detail,
+                                  key: const Key('offline-banner-detail'),
+                                  style: TextStyle(
+                                    color: c.ink2,
+                                    fontSize: 12,
+                                    height: 1.4,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ]),
+              ),
             ),
     );
   }

@@ -14,6 +14,7 @@ import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/mfa_challenge_page.dart';
 import '../../features/auth/presentation/mfa_setup_page.dart';
+import '../../features/auth/presentation/account_secured_page.dart';
 import '../../features/auth/presentation/new_device_page.dart';
 import '../../features/auth/presentation/new_password_page.dart';
 import '../../features/auth/presentation/otp_page.dart';
@@ -45,6 +46,7 @@ import '../../features/organization/presentation/organization_page.dart';
 import '../../features/organization/presentation/plan_page.dart';
 import '../../features/pricing/presentation/pricing_page.dart';
 import '../../features/settings/presentation/profile_page.dart';
+import '../../features/settings/presentation/my_devices_page.dart';
 import '../../features/settings/presentation/security_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
 import '../../features/settings/presentation/sync_page.dart';
@@ -254,6 +256,8 @@ const _publicPages = <String, Widget>{
   '/new-password': NewPasswordPage(),
   '/session-expired': SessionExpiredPage(),
   '/new-device': NewDevicePage(),
+  // After a trusted device answered "No": reached signed out, so public.
+  AccountSecuredPage.location: AccountSecuredPage(),
 };
 
 List<RouteBase> get _authRoutes => [
@@ -723,6 +727,15 @@ StatefulShellBranch _moreBranch(Ref ref) => StatefulShellBranch(
                 key: state.pageKey,
                 child: const SecurityPage(),
               ),
+              routes: [
+                GoRoute(
+                  path: 'devices',
+                  pageBuilder: (context, state) => _sharedAxisPage(
+                    key: state.pageKey,
+                    child: const MyDevicesPage(),
+                  ),
+                ),
+              ],
             ),
             GoRoute(
               path: 'notifications',
@@ -1000,6 +1013,13 @@ List<RouteBase> get _platformMoreRoutes => [
         path: 'security',
         pageBuilder: (context, state) =>
             _sharedAxisPage(key: state.pageKey, child: const SecurityPage()),
+        routes: [
+          GoRoute(
+            path: 'devices',
+            pageBuilder: (context, state) => _sharedAxisPage(
+                key: state.pageKey, child: const MyDevicesPage()),
+          ),
+        ],
       ),
       GoRoute(
         path: 'themes',
@@ -1244,6 +1264,8 @@ const _signedInAuthPages = <String>{
   '/forgot',
   '/otp',
   '/new-password',
+  // A trusted device answering "a new device signed in" (DeviceTrustBar).
+  '/new-device',
 };
 
 final appRouterProvider = Provider<GoRouter>((ref) {

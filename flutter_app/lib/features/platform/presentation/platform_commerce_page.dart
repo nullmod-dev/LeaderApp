@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/status_chip.dart';
 import '../../../l10n/strings.dart';
+import '../../pricing/data/commerce_backend.dart';
 import '../../pricing/data/commerce_control_plane.dart';
 import '../../pricing/data/pricing_catalog.dart';
 import '../../pricing/domain/billing_option.dart';
@@ -45,11 +46,39 @@ class PlatformCommercePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(commerceControlPlaneProvider);
+    final backend = ref.watch(commerceBackendProvider) != null;
     return PlatformPage(
       title: S.platformCommerceTitle,
+      onRefresh: backend
+          ? () => ref.read(commerceControlPlaneProvider.notifier).reload()
+          : null,
       children: [
         const PlatformPageIntro(lead: S.platformCommerceLead),
         const SizedBox(height: AppSpacing.lg),
+        if (state.phase == CommercePhase.loading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
+            child: LinearProgressIndicator(
+                key: Key('platform-commerce-loading')),
+          ),
+        if (state.phase == CommercePhase.failed) ...[
+          const PlatformNoteCard(
+            key: Key('platform-commerce-failed'),
+            title: S.platformCommerceLoadFailed,
+            body: S.platformCommerceLoadFailedBody,
+          ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const Key('platform-commerce-retry'),
+              onPressed: () =>
+                  ref.read(commerceControlPlaneProvider.notifier).reload(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text(S.retry),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         const SectionHeader(title: S.platformCommerceBasePrices),
         const _BasePrices(),
         SectionHeader(
@@ -90,10 +119,12 @@ class PlatformCommercePage extends ConsumerWidget {
         // page title, which made the whole commercial panel read as a test
         // build.
         const SizedBox(height: AppSpacing.xl),
-        const PlatformNoteCard(
-          key: Key('platform-commerce-build-note'),
+        PlatformNoteCard(
+          key: const Key('platform-commerce-build-note'),
           title: S.platformCommerceDevOnly,
-          body: S.platformCommerceDevOnlyNote,
+          body: backend
+              ? S.platformCommerceServerNote
+              : S.platformCommerceDevOnlyNote,
         ),
       ],
     );
@@ -242,7 +273,7 @@ class _OfferRow extends ConsumerWidget {
           : PlatformConfirmationSeverity.warning,
     );
     if (!confirmed || !context.mounted) return;
-    _report(
+    await _report(
       context,
       ref.read(platformCommerceActionsProvider).setOfferEnabled(
             offer.id,
@@ -265,7 +296,7 @@ class _OfferRow extends ConsumerWidget {
       severity: PlatformConfirmationSeverity.destructive,
     );
     if (!confirmed || !context.mounted) return;
-    _report(
+    await _report(
       context,
       ref.read(platformCommerceActionsProvider).removeOffer(offer.id),
     );
@@ -347,7 +378,7 @@ class _CouponRow extends ConsumerWidget {
           : PlatformConfirmationSeverity.warning,
     );
     if (!confirmed || !context.mounted) return;
-    _report(
+    await _report(
       context,
       ref.read(platformCommerceActionsProvider).setCouponEnabled(
             coupon.id,
@@ -368,7 +399,7 @@ class _CouponRow extends ConsumerWidget {
       severity: PlatformConfirmationSeverity.destructive,
     );
     if (!confirmed || !context.mounted) return;
-    _report(
+    await _report(
       context,
       ref.read(platformCommerceActionsProvider).removeCoupon(coupon.id),
     );
@@ -537,7 +568,9 @@ class _Empty extends StatelessWidget {
   }
 }
 
-void _report<T>(BuildContext context, Result<T> result) {
+Future<void> _report<T>(BuildContext context, Future<Result<T>> pending) async {
+  final result = await pending;
+  if (!context.mounted) return;
   final message = result.when(
     success: (_, {stale = false}) => S.platformCommerceSaved,
     failure: (_, code) => switch (code) {
@@ -545,7 +578,7 @@ void _report<T>(BuildContext context, Result<T> result) {
       CommerceCodes.couponCodeTaken => S.platformCommerceCodeTaken,
       _ => S.platformCommerceInvalid,
     },
-    offline: (_) => S.platformCommerceInvalid,
+    offline: (_) => S.actionNeedsConnection,
   );
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

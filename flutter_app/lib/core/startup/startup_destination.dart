@@ -32,6 +32,9 @@ import '../../features/auth/domain/auth_models.dart';
 import '../../features/auth/domain/onboarding_models.dart';
 import '../../features/auth/domain/session_access.dart';
 import '../../features/platform/domain/platform_area.dart';
+import 'launch_failure.dart';
+
+export 'launch_failure.dart';
 
 /// Where a launch belongs.
 ///
@@ -56,6 +59,16 @@ enum StartupDestination {
   /// The session itself may still be valid: the screen asks for a
   /// connection and a retry, never for a new sign-in.
   offlineSessionExpired(location: '/offline-session-expired'),
+
+  /// The session read could not reach the server — no network, or a request
+  /// that never arrived — and there is no stored copy to open instead. Two
+  /// values with [launchServerError] because the sentences differ: this one
+  /// is the phone's network, and the fix is the person's.
+  launchOffline(location: '/launch-offline'),
+
+  /// The server was reached and failed (`5xx`), and there is no stored copy.
+  /// «المشكلة ليست في هاتفك» — the fix is waiting, not the Wi-Fi settings.
+  launchServerError(location: '/launch-server-error'),
 
   /// An account payload this client cannot classify — a `super_admin` carrying
   /// a tenant id, a `main_admin` carrying none. Fails closed onto its own
@@ -145,8 +158,9 @@ enum StartupDestination {
 
   /// **Nothing can be concluded, and nothing will be.**
   ///
-  /// The session read answered and the answer was not evidence: an offline
-  /// device with no cached account, or a transport error. Distinct from
+  /// The session read answered and the answer was not evidence, and not a
+  /// failure this build can name either (a network or server failure with no
+  /// stored copy is [launchOffline] / [launchServerError]). Distinct from
   /// [restoring], which is still waiting and therefore still worth holding a
   /// loading screen for — this one has finished, and there is nothing more
   /// coming without connectivity.
@@ -222,7 +236,13 @@ class StartupInputs {
     this.access = SessionAccess.normal,
     this.hasTenantCapability = false,
     this.entry = const EntryNone(),
+    this.launchFailure = LaunchFailure.none,
   });
+
+  /// Why the session read failed, when it failed in a way a person can act
+  /// on. Consulted only when nothing at all could be read — no account, no
+  /// pre-session journey.
+  final LaunchFailure launchFailure;
 
   /// Whether the cold-launch brand intro is still on screen.
   ///
@@ -375,10 +395,15 @@ StartupDestination resolveStartup(StartupInputs input) {
   if (user == null) {
     // `AuthGate.unknown` with nothing cached: offline at a cold start, or a
     // transport error. Not evidence that anyone signed out, and not evidence
-    // that anyone is signed in either — so nothing is decided. See
-    // [StartupDestination.unresolved] for why this is not held on the loading
-    // screen instead.
-    return StartupDestination.unresolved;
+    // that anyone is signed in either — so nothing about the account is
+    // decided. What *is* known is why the read failed, and an empty `/home`
+    // says nothing about that: the network and the server each get a screen
+    // that names the problem and offers the retry.
+    return switch (input.launchFailure) {
+      LaunchFailure.network => StartupDestination.launchOffline,
+      LaunchFailure.server => StartupDestination.launchServerError,
+      LaunchFailure.none => StartupDestination.unresolved,
+    };
   }
 
   // Fails closed a second time. `AuthGate.invalid` already catches this, and

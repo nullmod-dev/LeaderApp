@@ -14,6 +14,7 @@ import '../../../l10n/strings.dart';
 import '../../detachment/data/detachment_providers.dart';
 import '../data/inventory_providers.dart';
 import '../domain/inventory_models.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Create (`itemId == null`) or edit one stock item.
 ///
@@ -272,7 +273,7 @@ class _S extends ConsumerState<InventoryItemEditPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 
@@ -305,7 +306,7 @@ class _S extends ConsumerState<InventoryItemEditPage> {
       failure: (message, _) => ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message))),
       offline: (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          .showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

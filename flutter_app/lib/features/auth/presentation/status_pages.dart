@@ -19,15 +19,13 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/startup/startup_destination.dart';
 import '../../../core/theme/app_palette.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/status_screen.dart';
 import '../../../l10n/strings.dart';
-import '../../about/domain/support_contacts.dart';
+import '../../about/presentation/support_handoff.dart';
 import '../data/auth_providers.dart';
 import '../domain/auth_models.dart';
 import '../data/sign_out_controller.dart';
@@ -73,115 +71,23 @@ class _SignOutButton extends ConsumerWidget {
   }
 }
 
-/// Shows the app's real support addresses, in a dialog.
+/// Opens «تواصل مع الدعم» over the screen.
 ///
 /// **Deliberately not a link to About.** `/more/about` lives inside the tenant
 /// shell branch, so opening it would build `MainShell` — the bottom nav, and
 /// the providers behind it — for exactly the sessions that must never
-/// instantiate the tenant surface (`§32`). A dialog over the state screen
+/// instantiate the tenant surface (`§32`). A sheet over the state screen
 /// needs no route, no navigator branch and no repository, and it reads the
-/// same two constants About does, so there is still one source for the
-/// addresses.
+/// same contacts About does, so there is still one source for them.
 class _SupportButton extends StatelessWidget {
   const _SupportButton();
 
   @override
   Widget build(BuildContext context) => OutlinedButton.icon(
-        onPressed: () => showDialog<void>(
-          context: context,
-          builder: (_) => const _SupportDialog(),
-        ),
+        onPressed: () => showSupportSheet(context),
         icon: const Icon(Icons.support_agent_rounded),
         label: const Text(S.contactSupport),
       );
-}
-
-class _SupportDialog extends StatelessWidget {
-  const _SupportDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return AlertDialog(
-      scrollable: true,
-      title: const Text(S.aboutSupport),
-      content: const Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(S.aboutSupportBody),
-          SizedBox(height: AppSpacing.lg),
-          // An address and a Telegram handle are Latin identifiers: forced LTR
-          // so they read correctly inside the Arabic layout, the same
-          // treatment About already gives them.
-          _Contact(
-            label: S.aboutSupportEmailLabel,
-            value: supportEmail,
-            copied: S.aboutEmailCopied,
-          ),
-          SizedBox(height: AppSpacing.md),
-          _Contact(
-            label: S.aboutSupportTelegramLabel,
-            value: supportTelegram,
-            copied: S.aboutTelegramCopied,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text(S.close),
-        ),
-      ],
-      backgroundColor: c.surface,
-    );
-  }
-}
-
-class _Contact extends StatelessWidget {
-  const _Contact({
-    required this.label,
-    required this.value,
-    required this.copied,
-  });
-
-  final String label;
-  final String value;
-  final String copied;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Row(children: [
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(color: c.ink3, fontSize: 12)),
-            Directionality(
-              textDirection: TextDirection.ltr,
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: SelectableText(
-                  value,
-                  style: TextStyle(color: c.ink, fontSize: 14),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      IconButton(
-        tooltip: S.copy,
-        onPressed: () async {
-          final messenger = ScaffoldMessenger.maybeOf(context);
-          await Clipboard.setData(ClipboardData(text: value));
-          messenger?.showSnackBar(SnackBar(content: Text(copied)));
-        },
-        icon: const Icon(Icons.copy_rounded, size: 18),
-      ),
-    ]);
-  }
 }
 
 /// The account card, when there is an account to name.
@@ -248,6 +154,61 @@ class _OfflineSessionExpiredPageState
       body: S.offlineSessionExpiredBody,
       detail: _retried && !busy ? S.offlineSessionStillOffline : null,
       primaryAction: FilledButton.icon(
+        onPressed: busy
+            ? null
+            : () {
+                setState(() => _retried = true);
+                ref.invalidate(currentUserResultProvider);
+              },
+        icon: busy
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded),
+        label: const Text(S.retry),
+      ),
+      secondaryAction: const _SignOutButton(),
+    );
+  }
+}
+
+/// A launch that could read nothing: no stored copy of the account, and the
+/// server either unreachable ([LaunchFailure.network]) or failing
+/// ([LaunchFailure.server]).
+///
+/// Used to land on an empty `/home`, where every guarded control was refused
+/// and nothing said why. The tokens are kept — this is not a sign-out — so a
+/// retry that reaches the server moves the person on by itself (into the app,
+/// or to `/session-expired` if the server ended the session meanwhile).
+class LaunchErrorPage extends ConsumerStatefulWidget {
+  const LaunchErrorPage({super.key, required this.failure});
+
+  final LaunchFailure failure;
+
+  @override
+  ConsumerState<LaunchErrorPage> createState() => _LaunchErrorPageState();
+}
+
+class _LaunchErrorPageState extends ConsumerState<LaunchErrorPage> {
+  bool _retried = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = ref.watch(currentUserResultProvider).isLoading;
+    final server = widget.failure == LaunchFailure.server;
+    return StatusScreen(
+      icon: server ? Icons.cloud_off_outlined : Icons.wifi_off_rounded,
+      tone: StatusTone.warning,
+      title: server ? S.launchServerErrorTitle : S.launchOfflineTitle,
+      body: server ? S.launchServerErrorBody : S.launchOfflineBody,
+      detail: _retried && !busy
+          ? (server
+              ? S.launchServerStillFailing
+              : S.offlineSessionStillOffline)
+          : null,
+      primaryAction: FilledButton.icon(
+        key: const Key('launch-error-retry'),
         onPressed: busy
             ? null
             : () {
@@ -480,6 +441,8 @@ class DemoExpiredPage extends StatelessWidget {
 /// once.
 const Map<String, Widget> startupStatusPages = {
   '/offline-session-expired': OfflineSessionExpiredPage(),
+  '/launch-offline': LaunchErrorPage(failure: LaunchFailure.network),
+  '/launch-server-error': LaunchErrorPage(failure: LaunchFailure.server),
   '/session-invalid': SessionInvalidPage(),
   '/session-unsupported': AccessUnsupportedPage(),
   '/access-not-assigned': AccessNotAssignedPage(),

@@ -9,6 +9,7 @@ import '../../features/app_version/data/http_app_version_repository.dart';
 import '../../features/auth/data/auth_providers.dart';
 import '../../features/auth/data/device_authenticator.dart';
 import '../../features/auth/data/device_id_store.dart';
+import '../../features/auth/data/device_trust_repository.dart';
 import '../../features/auth/data/full_session_snapshot_store.dart';
 import '../../features/auth/data/http_auth_repository.dart';
 import '../../features/auth/data/http_onboarding_repository.dart';
@@ -23,10 +24,14 @@ import '../../features/home/data/http_home_repository.dart';
 import '../../features/inventory/data/http_inventory_repository.dart';
 import '../../features/inventory/data/inventory_providers.dart';
 import '../../features/notification/data/http_notification_repository.dart';
+import '../../features/notification/data/http_notification_state_store.dart';
 import '../../features/notification/data/notification_providers.dart';
+import '../../features/notification/domain/notification_history_store.dart';
+import '../../features/notification/domain/notification_read_store.dart';
 import '../../features/organization/data/http_organization_repository.dart';
 import '../../features/organization/data/organization_providers.dart';
 import '../../features/platform/data/http_platform_break_glass_repository.dart';
+import '../../features/pricing/data/commerce_backend.dart';
 import '../../features/platform/data/http_platform_insights_repositories.dart';
 import '../../features/platform/data/http_platform_main_admin_repository.dart';
 import '../../features/platform/data/http_platform_reports_repository.dart';
@@ -54,6 +59,9 @@ import '../../features/tenant_feature/data/tenant_feature_providers.dart';
 import '../../features/workshop/data/http_workshop_repository.dart';
 import '../../features/workshop/data/workshop_providers.dart';
 import '../sync/http_sync_transport.dart';
+import '../sync/outbox_controller.dart';
+import '../sync/outbox_store.dart';
+import '../sync/secure_sync_stores.dart';
 import '../sync/sync_coordinator.dart';
 import '../sync/sync_payload_store.dart';
 import '../time/clock.dart';
@@ -89,6 +97,9 @@ List<Override> backendOverrides({required SettingsRepository deviceSettings}) =>
           ref.watch(authStateStoreProvider),
           deviceId: ref.watch(deviceIdStoreProvider).read,
         ),
+      ),
+      deviceTrustRepositoryProvider.overrideWith(
+        (ref) => HttpDeviceTrustRepository(ref.watch(apiClientProvider)),
       ),
       appVersionRepositoryProvider.overrideWith(
         (ref) => HttpAppVersionRepository(ref.watch(apiClientProvider)),
@@ -140,6 +151,22 @@ List<Override> backendOverrides({required SettingsRepository deviceSettings}) =>
             ref.watch(demoWorkspaceProvider)?.notifications ??
             HttpNotificationRepository(ref.watch(apiClientProvider)),
       ),
+      // Read state and cleared history live on the server, per account. A
+      // demo trial has no server account: it keeps them in memory, as before.
+      // Rebuilt when the account changes, so the next one never sees the
+      // previous one's set.
+      httpNotificationStateStoreProvider.overrideWith((ref) {
+        ref.watch(currentUserProvider.select((u) => u.valueOrNull?.id));
+        return ref.watch(demoWorkspaceProvider) != null
+            ? null
+            : HttpNotificationStateStore(ref.watch(apiClientProvider));
+      }),
+      notificationReadStoreProvider.overrideWith((ref) =>
+          ref.watch(httpNotificationStateStoreProvider) ??
+          InMemoryNotificationReadStore()),
+      notificationHistoryStoreProvider.overrideWith((ref) =>
+          ref.watch(httpNotificationStateStoreProvider) ??
+          InMemoryNotificationHistoryStore()),
       announcementRepositoryProvider.overrideWith(
         (ref) =>
             ref.watch(demoWorkspaceProvider)?.announcements ??
@@ -161,12 +188,37 @@ List<Override> backendOverrides({required SettingsRepository deviceSettings}) =>
               ref.read(currentUserProvider).valueOrNull?.saasTenantId,
         ),
       ),
+      // The outbox and its payloads survive an app restart, in the secure
+      // store, one queue per signed-in account (see `secure_sync_stores.dart`).
+      // A demo trial and the moment before the account is known keep the
+      // process-memory stores they always had.
+      outboxStoreProvider.overrideWith((ref) {
+        final accountId = _durableSyncAccount(ref);
+        return accountId == null
+            ? InMemoryOutboxStore()
+            : SecureOutboxStore(ref.watch(secureStoreProvider),
+                accountId: accountId);
+      }),
+      syncPayloadStoreProvider.overrideWith((ref) {
+        final accountId = _durableSyncAccount(ref);
+        return accountId == null
+            ? InMemorySyncPayloadStore()
+            : SecureSyncPayloadStore(ref.watch(secureStoreProvider),
+                accountId: accountId);
+      }),
       syncTransportProvider.overrideWith(
         (ref) => HttpSyncTransport(
           ref.watch(apiClientProvider),
           ref.watch(syncPayloadStoreProvider),
         ),
       ),
+
+      // Commerce (Point 19): offers and coupons on the server, coupon codes
+      // judged there. A demo trial keeps the local development plane.
+      commerceBackendProvider.overrideWith((ref) =>
+          ref.watch(demoWorkspaceProvider) != null
+              ? null
+              : HttpCommerceBackend(ref.watch(apiClientProvider))),
 
       // ---- control plane (Super Admin, /platform/**) ------------------------
       saasTenantRepositoryProvider.overrideWith(
@@ -203,3 +255,11 @@ List<Override> backendOverrides({required SettingsRepository deviceSettings}) =>
         (ref) => HttpPlatformBreakGlassRepository(ref.watch(apiClientProvider)),
       ),
     ];
+
+/// The account whose durable sync queue is in use, or `null` for the
+/// process-memory one: a demo trial (no server account), or no account read
+/// yet.
+String? _durableSyncAccount(Ref ref) {
+  if (ref.watch(demoWorkspaceProvider) != null) return null;
+  return ref.watch(currentUserProvider.select((u) => u.valueOrNull?.id));
+}

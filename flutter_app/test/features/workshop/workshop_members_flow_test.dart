@@ -428,7 +428,7 @@ void main() {
     await tester.tap(onPage(find.widgetWithText(FilledButton, S.save)));
     await settlePlatform(tester);
 
-    expect(find.text(S.offlineTitle), findsOneWidget);
+    expect(find.text(S.actionNeedsConnection), findsOneWidget);
     // The page stays, with the input kept, and the register is unchanged.
     expect(find.byType(WorkshopMemberFormPage), findsOneWidget);
     expect(onPage(find.text(candidate)), findsOneWidget);

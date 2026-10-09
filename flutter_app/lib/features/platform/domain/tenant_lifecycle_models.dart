@@ -437,6 +437,17 @@ class DeletedTenantTombstone {
   /// evidence itself and carries no actor, IP address, or operational data.
   final String historyReference;
 
+  /// The server's tombstone record (`GET /platform/tenants/:id` after final
+  /// deletion, and the `tombstone` of a finalize reply).
+  factory DeletedTenantTombstone.fromJson(Map<String, dynamic> json) =>
+      DeletedTenantTombstone(
+        tenantId: json['tenantId'] as String,
+        displayNameSnapshot: json['displayNameSnapshot'] as String,
+        deletedAt: DateTime.parse(json['deletedAt'] as String).toUtc(),
+        lifecycleVersion: (json['lifecycleVersion'] as num).toInt(),
+        historyReference: json['historyReference'] as String,
+      );
+
   Map<String, dynamic> toJson() => {
         'tenantId': tenantId,
         'displayNameSnapshot': displayNameSnapshot,

@@ -106,6 +106,7 @@ class InviteSimpleAdminCommand {
     required this.capabilityKeys,
     required this.expectedRevision,
     required this.idempotencyKey,
+    this.detachmentIds = const {},
   });
 
   final String email;
@@ -113,6 +114,10 @@ class InviteSimpleAdminCommand {
   final Set<String> capabilityKeys;
   final int expectedRevision;
   final String idempotencyKey;
+
+  /// Where the detachment-level keys apply: empty means every detachment
+  /// (team-wide). See [simpleAdminGrant].
+  final Set<String> detachmentIds;
 }
 
 @immutable
@@ -132,12 +137,52 @@ class UpdateSimpleAdminCapabilitiesCommand {
     required this.accountId,
     required this.capabilityKeys,
     required this.expectedRevision,
+    this.detachmentIds = const {},
   });
 
   final String accountId;
   final Set<String> capabilityKeys;
   final int expectedRevision;
+
+  /// Where the detachment-level keys apply: empty means every detachment.
+  final Set<String> detachmentIds;
 }
+
+/// The grant the server builds from a key set and a detachment set — the
+/// client mirror of the backend's `grantFromKeys`.
+///
+/// Organisation-level keys ([Cap.global]: the workshop keys) are always held
+/// team-wide. Detachment-level keys ([Cap.scoped]) are team-wide when
+/// [detachmentIds] is empty, and held inside each named detachment otherwise.
+Capabilities simpleAdminGrant(Set<String> keys, Set<String> detachmentIds) {
+  final global = keys.where(Cap.global.contains).toSet();
+  final scoped = keys.where(Cap.scoped.contains).toSet();
+  if (detachmentIds.isEmpty) {
+    return Capabilities(global: Set.unmodifiable({...global, ...scoped}));
+  }
+  return Capabilities(
+    global: Set.unmodifiable(global),
+    scoped: {
+      for (final id in detachmentIds) id: Set<String>.unmodifiable(scoped),
+    },
+  );
+}
+
+/// The form a stored grant opens as: every key it holds anywhere, and the
+/// detachments its detachment-level keys are limited to (empty = all).
+({Set<String> keys, Set<String> detachmentIds}) simpleAdminFormOf(
+  Capabilities grant,
+) =>
+    (
+      keys: {
+        ...grant.global,
+        for (final keys in grant.scoped.values) ...keys,
+      },
+      detachmentIds: {
+        for (final entry in grant.scoped.entries)
+          if (entry.value.isNotEmpty) entry.key,
+      },
+    );
 
 /// The safe subset offered by this UI. Every entry is an existing key; the
 /// selector invents no permission and never offers tenant ownership,

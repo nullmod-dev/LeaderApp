@@ -2,6 +2,11 @@ import '../../../core/result/result.dart';
 import 'auth_models.dart';
 
 abstract class AuthRepository {
+  /// `currentUser` failure code when this phone's own token store could not
+  /// be read. Not a sign-out and not the server, so the launch stays
+  /// unresolved rather than blaming either.
+  static const deviceStorageCode = 'device_storage';
+
   Future<Result<AuthUser>> signIn({
     required String emailOrUsername,
     required String password,
@@ -29,8 +34,6 @@ abstract class AuthRepository {
   Future<Result<void>> setNewPassword(String password);
 
   Future<Result<AuthUser?>> currentUser();
-
-  Future<Result<void>> confirmNewDevice({required bool itsMe});
 
   Future<Result<void>> signOut();
 

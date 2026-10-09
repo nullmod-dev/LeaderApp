@@ -16,6 +16,7 @@ import '../domain/notification_selectors.dart';
 import 'mock_notification_repository.dart';
 import '../../tenant_feature/data/tenant_feature_providers.dart';
 import '../../tenant_feature/domain/tenant_feature_models.dart';
+import 'http_notification_state_store.dart';
 
 /// The record-derived half of the feed.
 ///
@@ -40,6 +41,12 @@ final notificationReadStoreProvider = Provider<NotificationReadStore>((ref) {
   return InMemoryNotificationReadStore();
 });
 
+/// The server-backed store behind both of the above, in a backend build;
+/// `null` everywhere else (the in-memory stores answer instead). Overridden
+/// by `backendOverrides`.
+final httpNotificationStateStoreProvider =
+    Provider<HttpNotificationStateStore?>((ref) => null);
+
 /// Where cleared history is persisted. A separate store from read state on
 /// purpose — see the note at the top of `notification_history_store.dart`.
 final notificationHistoryStoreProvider =
@@ -57,7 +64,9 @@ final notificationHistoryStoreProvider =
 class NotificationReadController extends AsyncNotifier<Set<String>> {
   @override
   Future<Set<String>> build() =>
-      ref.read(notificationReadStoreProvider).readIds();
+      // Watched, not read: a backend store follows the signed-in account,
+      // and a different account must start from its own set.
+      ref.watch(notificationReadStoreProvider).readIds();
 
   Set<String> get _current => state.valueOrNull ?? const {};
 
@@ -104,7 +113,7 @@ final notificationReadIdsProvider =
 class NotificationHistoryController extends AsyncNotifier<Set<String>> {
   @override
   Future<Set<String>> build() =>
-      ref.read(notificationHistoryStoreProvider).clearedIds();
+      ref.watch(notificationHistoryStoreProvider).clearedIds();
 
   Set<String> get _current => state.valueOrNull ?? const {};
 

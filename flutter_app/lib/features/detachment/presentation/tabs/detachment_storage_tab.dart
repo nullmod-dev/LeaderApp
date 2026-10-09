@@ -28,6 +28,7 @@ import '../../../inventory/domain/inventory_format.dart';
 import '../../../inventory/domain/inventory_models.dart';
 import '../../../shell/main_shell.dart';
 import '../../data/detachment_providers.dart';
+import '../../../../core/widgets/offline_banner.dart';
 
 /// Stock held by one detachment.
 ///
@@ -579,7 +580,7 @@ class _ItemSheetBodyState extends ConsumerState<_ItemSheetBody> {
       failure: (message, _) async =>
           messenger.showSnackBar(SnackBar(content: Text(message))),
       offline: (_) async =>
-          messenger.showSnackBar(const SnackBar(content: Text(S.offlineTitle))),
+          messenger.showSnackBar(actionNeedsConnectionSnackBar),
     );
   }
 }

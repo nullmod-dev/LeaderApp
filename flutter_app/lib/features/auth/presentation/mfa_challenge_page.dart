@@ -80,7 +80,7 @@ class _MfaChallengePageState extends ConsumerState<MfaChallengePage> {
       },
       offline: (_) => setState(() {
         _busy = false;
-        _error = S.offlineTitle;
+        _error = S.actionNeedsConnection;
       }),
     );
   }

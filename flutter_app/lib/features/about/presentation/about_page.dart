@@ -11,7 +11,7 @@ import '../../../core/widgets/made_in_iraq.dart';
 import '../../../l10n/strings.dart';
 import '../../settings/presentation/widgets/settings_widgets.dart';
 import '../../shell/main_shell.dart';
-import '../domain/support_contacts.dart';
+import 'support_handoff.dart';
 
 /// About & support (`/more/about`) — one screen, three blocks.
 ///
@@ -28,11 +28,13 @@ import '../domain/support_contacts.dart';
 /// has no backend behind it, so any such sentence would be a promise nobody
 /// made.
 ///
-/// **Support is a mail address and a Telegram username.** There is no ticket
-/// system, no form and no submission endpoint (see `support_contacts.dart`).
-/// Each contact offers two actions — open, and copy — and the copy is not a
-/// consolation prize: it is the action that always works, on a device with no
-/// mail client, in a screenshot, or when the handoff fails.
+/// **Support is a WhatsApp number, a Telegram username and a mail address.**
+/// There is no ticket system, no form and no submission endpoint (see
+/// `support_contacts.dart`). Each contact offers two actions — open, and copy
+/// — and the copy is not a consolation prize: it is the action that always
+/// works, on a device with no mail client, in a screenshot, or when the
+/// handoff fails. Opening WhatsApp or Telegram asks first
+/// ([confirmSupportHandoff]): the next thing on screen is another app.
 ///
 /// **Privacy Policy and Terms of Use are deliberately absent.** They are
 /// deferred until the backend's real data handling is known; a placeholder row
@@ -226,7 +228,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// The two approved ways to reach support.
+/// The approved ways to reach support: the two chat apps first, then mail.
 class _Support extends StatelessWidget {
   const _Support();
 
@@ -242,28 +244,26 @@ class _Support extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         const _ContactCard(
-          key: Key('about-email'),
-          icon: Icons.mail_outline_rounded,
-          label: S.aboutSupportEmailLabel,
-          value: supportEmail,
-          openLabel: S.aboutSupportEmailAction,
-          kind: _ContactKind.email,
+          key: Key('about-whatsapp'),
+          openLabel: S.aboutSupportWhatsAppAction,
+          channel: SupportChannel.whatsApp,
         ),
         const SizedBox(height: AppSpacing.sm),
         const _ContactCard(
           key: Key('about-telegram'),
-          icon: Icons.send_rounded,
-          label: S.aboutSupportTelegramLabel,
-          value: supportTelegram,
           openLabel: S.aboutSupportTelegramAction,
-          kind: _ContactKind.telegram,
+          channel: SupportChannel.telegram,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        const _ContactCard(
+          key: Key('about-email'),
+          openLabel: S.aboutSupportEmailAction,
+          channel: SupportChannel.email,
         ),
       ],
     );
   }
 }
-
-enum _ContactKind { email, telegram }
 
 /// One contact: what it is, the address itself, and two actions.
 ///
@@ -274,18 +274,12 @@ enum _ContactKind { email, telegram }
 class _ContactCard extends ConsumerStatefulWidget {
   const _ContactCard({
     super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
     required this.openLabel,
-    required this.kind,
+    required this.channel,
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
   final String openLabel;
-  final _ContactKind kind;
+  final SupportChannel channel;
 
   @override
   ConsumerState<_ContactCard> createState() => _ContactCardState();
@@ -297,6 +291,7 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final channel = widget.channel;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -309,14 +304,14 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
         children: [
           Row(
             children: [
-              Icon(widget.icon, size: 18, color: c.ink3),
+              Icon(channel.icon, size: 18, color: c.ink3),
               const SizedBox(width: AppSpacing.sm),
               // Flexible, not fixed: «البريد الإلكتروني» at a 1.5× text scale
               // on a 320dp phone is wider than the card, and a clipped label
               // is how a caption stops naming the value beneath it.
               Flexible(
                 child: Text(
-                  widget.label,
+                  channel.label,
                   style: TextStyle(color: c.ink3, fontSize: 12),
                 ),
               ),
@@ -332,7 +327,7 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
             child: Align(
               alignment: AlignmentDirectional.centerStart,
               child: SelectableText(
-                widget.value,
+                channel.value,
                 style: TextStyle(color: c.ink, fontSize: 14),
               ),
             ),
@@ -346,12 +341,12 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
             runSpacing: AppSpacing.xs,
             children: [
               FilledButton.tonal(
-                key: Key('about-open-${widget.kind.name}'),
+                key: Key('about-open-${channel.name}'),
                 onPressed: _busy ? null : _open,
                 child: Text(widget.openLabel),
               ),
               TextButton.icon(
-                key: Key('about-copy-${widget.kind.name}'),
+                key: Key('about-copy-${channel.name}'),
                 onPressed: _copy,
                 icon: const Icon(Icons.copy_rounded, size: 16),
                 label: const Text(S.copy),
@@ -367,37 +362,25 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
   /// the address with no subject appended. What is copied is what is on
   /// screen; anything else would be a surprise in someone's paste buffer.
   Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.value));
+    await Clipboard.setData(ClipboardData(text: widget.channel.value));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.kind == _ContactKind.email
-              ? S.aboutEmailCopied
-              : S.aboutTelegramCopied,
-        ),
-      ),
+      SnackBar(content: Text(widget.channel.copiedMessage)),
     );
   }
 
   Future<void> _open() async {
-    setState(() => _busy = true);
-    final launcher = ref.read(externalLinkLauncherProvider);
-
-    ExternalLinkOutcome outcome;
-    if (widget.kind == _ContactKind.email) {
-      outcome = await launcher.open(emailUri());
-    } else {
-      // The app first, then the browser. A device without Telegram installed
-      // has nothing registered for `tg:`, and `https://t.me/…` is handled by
-      // anything with a browser — so the fallback is a real second chance,
-      // not a second guess at the same door.
-      outcome = await launcher.open(telegramAppUri());
-      if (outcome != ExternalLinkOutcome.opened) {
-        outcome = await launcher.open(telegramWebUri());
-      }
+    final channel = widget.channel;
+    if (channel.asksFirst) {
+      // WhatsApp and Telegram: the sheet asks, opens on «نعم», and says any
+      // failure itself with the contact ready to copy.
+      await confirmSupportHandoff(context, channel);
+      return;
     }
 
+    setState(() => _busy = true);
+    final outcome = await openSupportChannel(
+        ref.read(externalLinkLauncherProvider), channel);
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -405,14 +388,8 @@ class _ContactCardState extends ConsumerState<_ContactCard> {
     // Claiming «تم الإرسال» would be the lie this screen exists to avoid.
     if (outcome == ExternalLinkOutcome.opened) return;
 
-    final message = switch (outcome) {
-      ExternalLinkOutcome.unsupported => widget.kind == _ContactKind.email
-          ? S.aboutEmailUnsupported
-          : S.aboutTelegramUnsupported,
-      _ => S.aboutLaunchFailed,
-    };
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(content: Text(channel.failureMessage(outcome))),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/brand/brand_mark.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
@@ -47,15 +48,12 @@ class AuthScaffold extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: c.primaryTint,
-                  borderRadius: BorderRadius.circular(AppRadii.lg),
-                ),
-                child: Icon(Icons.health_and_safety_rounded,
-                    color: c.primary, size: 30),
+              // The product's one mark, at the start of the column like the
+              // title under it. These screens' titles name a step («رمز
+              // التحقق»), never the product, so the mark is not a repeat.
+              const Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: BrandMark(size: 56),
               ),
               const SizedBox(height: AppSpacing.xl),
               Text(title, style: t.headlineMedium),

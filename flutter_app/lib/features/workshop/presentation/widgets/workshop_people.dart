@@ -9,6 +9,7 @@ import '../../../../core/widgets/status_chip.dart';
 import '../../../../l10n/strings.dart';
 import '../../../team/domain/team_models.dart';
 import '../../domain/workshop_models.dart';
+import '../../../../core/widgets/offline_banner.dart';
 
 /// The people-management pieces the two workshop people tabs share: the
 /// person row, the paid switch, the removal confirmation and the attendance /
@@ -36,7 +37,7 @@ bool reportWorkshopResult(
       return false;
     },
     offline: (_) {
-      messenger.showSnackBar(const SnackBar(content: Text(S.offlineTitle)));
+      messenger.showSnackBar(actionNeedsConnectionSnackBar);
       return false;
     },
   );

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
+import '../data/auth_entry_email_provider.dart';
 import '../data/auth_providers.dart';
 import '_auth_scaffold.dart';
 
@@ -40,9 +41,12 @@ class _S extends ConsumerState<NewPasswordPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     r.when(
-      success: (_, {stale = false}) => context.go('/login'),
+      success: (_, {stale = false}) {
+        ref.read(passwordResetEmailProvider.notifier).state = null;
+        context.go('/login');
+      },
       failure: (m, _) => setState(() => _error = m),
-      offline: (_) => setState(() => _error = S.offlineTitle),
+      offline: (_) => setState(() => _error = S.actionNeedsConnection),
     );
   }
 

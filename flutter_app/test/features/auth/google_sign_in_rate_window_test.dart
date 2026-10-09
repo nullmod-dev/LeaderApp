@@ -148,19 +148,44 @@ void main() {
   });
 
   group('DeviceIdStore', () {
-    test('mints one UUID v4 and keeps it across relaunches', () async {
-      final store = InMemoryLocalStore();
-      final first = await DeviceIdStore(store).read();
+    test('mints one UUID v4 in secure storage and keeps it across relaunches',
+        () async {
+      final secure = InMemorySecureStore();
+      final local = InMemoryLocalStore();
+      final first = await DeviceIdStore(secure, local).read();
       expect(isUuidV4(first), isTrue);
-      expect(await DeviceIdStore(store).read(), first);
-      expect(store.values[DeviceIdStore.storageKey], first);
+      expect(await DeviceIdStore(secure, local).read(), first);
+      expect(secure.values[DeviceIdStore.storageKey], first);
+      expect(local.values.containsKey(DeviceIdStore.storageKey), isFalse);
     });
 
     test('a corrupt stored value is replaced', () async {
-      final store = InMemoryLocalStore({DeviceIdStore.storageKey: 'nope'});
-      final id = await DeviceIdStore(store).read();
+      final secure = InMemorySecureStore({DeviceIdStore.storageKey: 'nope'});
+      final local = InMemoryLocalStore({DeviceIdStore.installedKey: '1'});
+      final id = await DeviceIdStore(secure, local).read();
       expect(isUuidV4(id), isTrue);
-      expect(store.values[DeviceIdStore.storageKey], id);
+      expect(secure.values[DeviceIdStore.storageKey], id);
+    });
+
+    test('an id an earlier build kept in preferences moves over unchanged',
+        () async {
+      const legacy = '0f6d2c9e-4b1a-4c3d-9e8f-1a2b3c4d5e6f';
+      final secure = InMemorySecureStore();
+      final local = InMemoryLocalStore({DeviceIdStore.storageKey: legacy});
+      expect(await DeviceIdStore(secure, local).read(), legacy);
+      expect(secure.values[DeviceIdStore.storageKey], legacy);
+      expect(local.values.containsKey(DeviceIdStore.storageKey), isFalse);
+      expect(await DeviceIdStore(secure, local).read(), legacy);
+    });
+
+    test('a reinstall is a new device, even when the Keychain kept the old id',
+        () async {
+      const left = '0f6d2c9e-4b1a-4c3d-9e8f-1a2b3c4d5e6f';
+      // iOS: secure storage survived the uninstall, preferences did not.
+      final secure = InMemorySecureStore({DeviceIdStore.storageKey: left});
+      final id = await DeviceIdStore(secure, InMemoryLocalStore()).read();
+      expect(id, isNot(left));
+      expect(isUuidV4(id), isTrue);
     });
 
     test('version and variant bits are set', () {
@@ -179,11 +204,13 @@ void main() {
     late int status;
     late ProviderContainer container;
     late InMemoryLocalStore local;
+    late InMemorySecureStore secure;
 
     setUp(() {
       requests = [];
       status = 409;
       local = InMemoryLocalStore();
+      secure = InMemorySecureStore();
       final authState = SecureAuthStateStore(InMemorySecureStore());
       final api = ApiClient(
         vault: TokenVault(authState),
@@ -204,6 +231,7 @@ void main() {
       );
       container = ProviderContainer(overrides: [
         localStoreProvider.overrideWithValue(local),
+        secureStoreProvider.overrideWithValue(secure),
         onboardingRepositoryProvider.overrideWith(
           (ref) => HttpOnboardingRepository(api, authState,
               deviceId: ref.watch(deviceIdStoreProvider).read),
@@ -223,7 +251,7 @@ void main() {
           .read(onboardingRepositoryProvider)
           .signInWithPassword(email: 'a@b.co', password: 'x');
 
-      final id = local.values[DeviceIdStore.storageKey]!;
+      final id = secure.values[DeviceIdStore.storageKey]!;
       expect(isUuidV4(id), isTrue);
       expect(requests.first.url.path, '/api/v1/auth/google');
       expect(requests.first.headers['X-Device-Id'], id);

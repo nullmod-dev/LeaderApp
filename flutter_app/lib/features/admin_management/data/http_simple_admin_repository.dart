@@ -56,6 +56,8 @@ class HttpSimpleAdminRepository implements SimpleAdminRepository {
           'invitedEmail': command.email,
           'suggestedName': command.suggestedName,
           'capabilityKeys': command.capabilityKeys.toList(),
+          if (command.detachmentIds.isNotEmpty)
+            'detachmentIds': command.detachmentIds.toList(),
           'expectedRevision': command.expectedRevision,
         },
         idempotencyKey: command.idempotencyKey,
@@ -85,6 +87,9 @@ class HttpSimpleAdminRepository implements SimpleAdminRepository {
             '${Uri.encodeComponent(command.accountId)}/capabilities',
         body: {
           'capabilityKeys': command.capabilityKeys.toList(),
+          // Absent = team-wide (the server's `grantFromKeys`).
+          if (command.detachmentIds.isNotEmpty)
+            'detachmentIds': command.detachmentIds.toList(),
           'expectedRevision': command.expectedRevision,
         },
         parse: (json) => _account(

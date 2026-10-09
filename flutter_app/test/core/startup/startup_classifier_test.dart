@@ -27,6 +27,7 @@ void main() {
     bool upgradeBlocks = false,
     SessionAccess access = SessionAccess.normal,
     bool? hasCapability,
+    LaunchFailure launchFailure = LaunchFailure.none,
   }) =>
       resolveStartup(StartupInputs(
         gate: gate,
@@ -34,6 +35,7 @@ void main() {
         user: user,
         upgradeBlocks: upgradeBlocks,
         access: access,
+        launchFailure: launchFailure,
         hasTenantCapability:
             hasCapability ?? (user?.capabilities.hasAny ?? false),
       ));
@@ -89,6 +91,33 @@ void main() {
       expect(destination, StartupDestination.unresolved);
       expect(destination.location, isNull);
       expect(destination.isProductSurface, isFalse);
+    });
+
+    test('a read that could not reach the server names the network', () {
+      final destination = resolve(
+          gate: AuthGate.unknown, launchFailure: LaunchFailure.network);
+      expect(destination, StartupDestination.launchOffline);
+      expect(destination.location, '/launch-offline');
+      expect(destination.isProductSurface, isFalse);
+    });
+
+    test('a 5xx with nothing stored names the server', () {
+      expect(
+        resolve(gate: AuthGate.unknown, launchFailure: LaunchFailure.server),
+        StartupDestination.launchServerError,
+      );
+    });
+
+    test('a launch failure never outranks an account the phone holds', () {
+      // Offline *with* a copy is a signed-in session: the failure is
+      // irrelevant, and the app opens on the copy.
+      expect(
+        resolve(
+          user: _mainAdmin,
+          launchFailure: LaunchFailure.network,
+        ),
+        StartupDestination.tenantSurface,
+      );
     });
   });
 
@@ -424,6 +453,8 @@ void main() {
         // application from an isolated workspace, so it has no location of
         // its own and therefore no status page behind it.
         StartupDestination.demoExpired,
+        StartupDestination.launchOffline,
+        StartupDestination.launchServerError,
       };
       for (final destination in owned) {
         expect(

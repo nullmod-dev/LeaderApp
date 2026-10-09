@@ -116,11 +116,12 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   /// The way out: back to sign-up for an address being proved, back to the
-  /// sign-in form for a returning account's sign-in code.
+  /// sign-in form for a sign-in code or a new device's code.
   Future<void> _leave(VerificationPurpose purpose) async {
     await ref.read(onboardingControllerProvider.notifier).abandon();
     if (!mounted) return;
-    context.go(purpose == VerificationPurpose.signIn ? '/login' : '/signup');
+    context.go(
+        purpose == VerificationPurpose.emailOwnership ? '/signup' : '/login');
   }
 
   @override
@@ -139,14 +140,23 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     }
     final challenge = entry.challenge;
     final signIn = challenge.purpose == VerificationPurpose.signIn;
+    final newDevice = challenge.purpose == VerificationPurpose.newDevice;
     final now = ref.watch(clockProvider)();
     final cooldown = challenge.resendCooldownAt(now);
     final canResend = cooldown == Duration.zero;
 
     final masked = '\u2066${challenge.maskedEmail}\u2069';
     return AuthScaffold(
-      title: signIn ? S.signInVerificationTitle : S.emailVerificationTitle,
-      subtitle: signIn ? '${S.signInCodeSentTo}$masked' : masked,
+      title: newDevice
+          ? S.newDeviceVerificationTitle
+          : signIn
+              ? S.signInVerificationTitle
+              : S.emailVerificationTitle,
+      subtitle: newDevice
+          ? '${S.newDeviceCodeSentTo}$masked'
+          : signIn
+              ? '${S.signInCodeSentTo}$masked'
+              : masked,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -213,11 +223,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
           const SizedBox(height: AppSpacing.xl),
           Center(
             child: TextButton(
-              onPressed: _busy || _resending
-                  ? null
-                  : () => _leave(challenge.purpose),
+              onPressed:
+                  _busy || _resending ? null : () => _leave(challenge.purpose),
               child: Text(
-                signIn ? S.useAnotherAccount : S.useAnotherEmail,
+                signIn || newDevice ? S.useAnotherAccount : S.useAnotherEmail,
                 style: TextStyle(color: c.ink3, fontSize: 13),
               ),
             ),

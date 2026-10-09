@@ -1,4 +1,3 @@
-import '../../../core/access/capability.dart';
 import '../../../core/result/result.dart';
 import '../domain/simple_admin_models.dart';
 import '../domain/simple_admin_repository.dart';
@@ -84,7 +83,7 @@ class MockSimpleAdminRepository implements SimpleAdminRepository {
       email: email,
       suggestedName: name,
       capabilities:
-          Capabilities(global: Set.unmodifiable(command.capabilityKeys)),
+          simpleAdminGrant(command.capabilityKeys, command.detachmentIds),
       createdAt: now,
       expiresAt: now.add(const Duration(days: 7)),
       status: SimpleAdminInvitationStatus.pending,
@@ -138,7 +137,7 @@ class MockSimpleAdminRepository implements SimpleAdminRepository {
     }
     final updated = account.copyWith(
       capabilities:
-          Capabilities(global: Set.unmodifiable(command.capabilityKeys)),
+          simpleAdminGrant(command.capabilityKeys, command.detachmentIds),
       revision: account.revision + 1,
     );
     store.accounts[account.id] = updated;

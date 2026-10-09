@@ -316,9 +316,6 @@ class _FakeAuthRepo implements AuthRepository {
   Future<Result<void>> setNewPassword(String password) async =>
       const Success(null);
 
-  @override
-  Future<Result<void>> confirmNewDevice({required bool itsMe}) async =>
-      const Success(null);
 
   @override
   Future<Result<AuthUser>> signIn({

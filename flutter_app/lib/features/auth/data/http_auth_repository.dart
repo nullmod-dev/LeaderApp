@@ -18,11 +18,12 @@ import 'full_session_snapshot_store.dart';
 /// mock's (`currentSessionAccess`), without a second request.
 ///
 /// A cold launch with no network opens on the last confirmed account
-/// ([FullSessionSnapshotStore]) for up to seven days after the sign-in, as
-/// long as the phone still holds that same session — the server's
-/// `sessionId`, stored beside the tokens ([SessionTokens.sessionId]). Past
-/// the seven days the read answers [offlineExpiredCode] and the tokens stay,
-/// so the next online read can still succeed.
+/// ([FullSessionSnapshotStore]) for up to seven days after the last
+/// successful server contact, as long as the phone still holds that same
+/// session — the server's `sessionId`, stored beside the tokens
+/// ([SessionTokens.sessionId]). Offline opens never extend the seven days.
+/// Past them the read answers [offlineExpiredCode] and the tokens stay, so
+/// the next online read can still succeed.
 ///
 /// The Customer Demo stays local, exactly as with the mock: the trial's data
 /// is the in-memory `DemoWorkspace`, so [startCustomerDemo] installs the demo
@@ -66,6 +67,10 @@ class HttpAuthRepository implements AuthRepository {
   DateTime? _trustEndsAt;
 
   SessionAccess get currentSessionAccess => _access;
+
+  /// When this phone stops opening the account offline (seven days after its
+  /// last server contact), or `null` when it holds no offline copy.
+  DateTime? get offlineTrustEndsAt => _trustEndsAt;
 
   /// How long until the current session's offline copy expires; `null`
   /// when no copy is held or it has already expired.
@@ -140,8 +145,9 @@ class HttpAuthRepository implements AuthRepository {
     try {
       tokens = await _vault.read();
     } catch (_) {
-      // A vault failure is not evidence of sign-out.
-      return const Failure('', code: 'server');
+      // A vault failure is not evidence of sign-out — and it is this phone's
+      // storage, not the server, so it must not read as a server failure.
+      return const Failure('', code: AuthRepository.deviceStorageCode);
     }
     if (tokens == null || tokens.grade != SessionGrade.full) {
       _me = null;
@@ -162,9 +168,7 @@ class HttpAuthRepository implements AuthRepository {
             return const Failure('', code: offlineExpiredCode);
           }
           if (restored == _Restore.opened) return Offline(cached: _me);
-          return offline
-              ? const Offline()
-              : const Failure('', code: 'network');
+          return offline ? const Offline() : const Failure('', code: 'network');
         }
         return offline
             ? Offline(cached: _me)
@@ -196,14 +200,18 @@ class HttpAuthRepository implements AuthRepository {
           if (await _restoreSnapshot(tokens) == _Restore.opened) {
             return Offline(cached: _me);
           }
+          // Whatever code the body carried, a 5xx with nothing to open is the
+          // server's failure, and the launch says so.
+          return Failure(failureMessage(ProblemCode.server.wire),
+              code: ProblemCode.server.wire);
         }
         return Failure(failureMessage(code), code: code);
     }
   }
 
-  /// Keeps what this read confirmed for an offline cold launch. The sign-in
-  /// instant is carried over while the session is the same one, so seven
-  /// days stay seven days however often the account is re-read.
+  /// Keeps what this read confirmed for an offline cold launch. This read
+  /// reached the server, so it is the new last contact: the seven offline
+  /// days start again from now (the server slid the session the same way).
   ///
   /// The session is the one `/auth/me` named ([named]), which is also stored
   /// beside the tokens; an older server that names none falls back to the
@@ -225,21 +233,18 @@ class HttpAuthRepository implements AuthRepository {
       await _forgetSnapshot();
       return;
     }
-    final previous = await snapshots.read();
     final snapshot = FullSessionSnapshot(
       sessionId: sessionId,
       user: user,
       access: _access,
-      signedInAt: previous != null && previous.sessionId == sessionId
-          ? previous.signedInAt
-          : _clock().toUtc(),
+      lastServerContactAt: _clock().toUtc(),
     );
     await snapshots.write(snapshot);
     _trustEndsAt = snapshot.trustEndsAt;
   }
 
   /// Opens the stored account when it belongs to the session this phone
-  /// still holds and its sign-in is less than seven days old. A copy of
+  /// still holds and its last server contact is less than seven days old. A copy of
   /// another session — or tokens with no id to match — is removed.
   Future<_Restore> _restoreSnapshot(SessionTokens tokens) async {
     final snapshot = await _snapshots?.read();
@@ -384,20 +389,16 @@ class HttpAuthRepository implements AuthRepository {
     return result;
   }
 
-  @override
-  Future<Result<void>> confirmNewDevice({required bool itsMe}) async {
-    final result = await _api.send<void>(
-      'POST',
-      '/auth/new-device/confirm',
-      body: {'itsMe': itsMe},
-      parse: (_) {},
-    );
-    // "Not me" revokes every session of the account, this one included.
-    if (result.isSuccess && !itsMe) {
-      await _vault.clearFull();
-      await _forgetSnapshot();
-    }
-    return result;
+  /// The server already ended every session of the account (a trusted
+  /// device answered "No" to a new one): forget this phone's copy of it
+  /// without asking the server anything.
+  Future<void> forgetLocalSession() async {
+    _endDemo();
+    _me = null;
+    _access = SessionAccess.normal;
+    _sessionExpired = false;
+    await _forgetSnapshot();
+    await _vault.clearFull();
   }
 
   @override

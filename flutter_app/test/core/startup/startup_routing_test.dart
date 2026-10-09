@@ -13,6 +13,7 @@ import 'package:mtm/core/theme/app_palette.dart';
 import 'package:mtm/core/theme/app_theme.dart';
 import 'package:mtm/features/auth/data/auth_providers.dart';
 import 'package:mtm/features/auth/domain/auth_models.dart';
+import 'package:mtm/features/auth/domain/auth_repository.dart';
 import 'package:mtm/features/auth/domain/session_access.dart';
 import 'package:mtm/features/auth/presentation/dev_session_states_page.dart';
 import 'package:mtm/features/auth/presentation/login_page.dart';
@@ -546,9 +547,11 @@ void main() {
 
     testWidgets('an inconclusive session is left exactly where it asked',
         (tester) async {
-      // Offline with nothing cached. Unchanged from before Point 3, and
-      // deliberately so — see `StartupDestination.unresolved`.
-      final container = _container(const Offline<AuthUser?>());
+      // The phone's own token store could not be read: neither the network
+      // nor the server, so nothing is named — see
+      // `StartupDestination.unresolved`.
+      final container = _container(const Failure<AuthUser?>('',
+          code: AuthRepository.deviceStorageCode));
       final router = await _boot(tester, container,
           ignoreNoise: ignoreKnownPreexistingComplaints);
 
@@ -556,6 +559,47 @@ void main() {
       await _settle(tester);
       expect(at(router), '/more/security');
       expect(find.byType(LoginPage), findsNothing);
+    });
+
+    testWidgets('offline with nothing stored says so instead of an empty home',
+        (tester) async {
+      final container = _container(const Offline<AuthUser?>());
+      final router = await _boot(tester, container,
+          ignoreNoise: ignoreKnownPreexistingComplaints);
+
+      router.go('/home');
+      await _settle(tester);
+      expect(at(router), '/launch-offline');
+      expect(find.text(S.launchOfflineTitle), findsOneWidget);
+      expect(find.byType(LoginPage), findsNothing);
+      expect(find.byType(MainShell), findsNothing,
+          reason: 'no tenant shell under a session that read nothing');
+    });
+
+    testWidgets('a request that never arrived reads as the network too',
+        (tester) async {
+      final container = _container(
+          const Failure<AuthUser?>('', code: 'network'));
+      final router = await _boot(tester, container,
+          ignoreNoise: ignoreKnownPreexistingComplaints);
+
+      router.go('/home');
+      await _settle(tester);
+      expect(at(router), '/launch-offline');
+    });
+
+    testWidgets('a failing server gets its own sentence', (tester) async {
+      final container = _container(
+          const Failure<AuthUser?>('', code: 'server'));
+      final router = await _boot(tester, container,
+          ignoreNoise: ignoreKnownPreexistingComplaints);
+
+      router.go('/home');
+      await _settle(tester);
+      expect(at(router), '/launch-server-error');
+      expect(find.text(S.launchServerErrorTitle), findsOneWidget);
+      expect(find.text(S.launchServerErrorBody), findsOneWidget);
+      expect(find.byKey(const Key('launch-error-retry')), findsOneWidget);
     });
   });
 }

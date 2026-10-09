@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/motion/transitions.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/widgets/shell_insets.dart';
+import '../../auth/presentation/device_trust_bar.dart';
+import '../../auth/presentation/offline_copy_bar.dart';
 import '../domain/platform_area.dart';
 import 'widgets/platform_navigation.dart';
 import 'widgets/platform_break_glass_strip.dart';
@@ -80,8 +82,23 @@ class PlatformShell extends ConsumerWidget {
     );
     final body = Column(
       children: [
-        const PlatformBreakGlassStrip(),
-        Expanded(child: PlatformBreakGlassBodyInset(child: branchBody)),
+        // Running on the stored copy of the account, offline.
+        const OfflineCopyBar(),
+        Expanded(
+          child: OfflineCopyInset(
+            child: Column(
+              children: [
+                const DeviceTrustBar(),
+                const PlatformBreakGlassStrip(),
+                Expanded(
+                  child: DeviceTrustBodyInset(
+                    child: PlatformBreakGlassBodyInset(child: branchBody),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
 

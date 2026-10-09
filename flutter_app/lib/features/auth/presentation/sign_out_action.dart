@@ -6,9 +6,12 @@ import '../../../core/problem/problem.dart';
 import '../../../core/problem/problem_presentation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/strings.dart';
+import '../../../core/result/result.dart';
 import '../data/auth_providers.dart';
+import '../data/http_auth_repository.dart';
 import '../domain/auth_models.dart';
 import '../data/sign_out_controller.dart';
+import '../../../core/widgets/offline_banner.dart';
 
 /// Signs out and leaves for the login screen — the one implementation, shared
 /// by the Settings hub's button and the account screen's.
@@ -31,6 +34,10 @@ import '../data/sign_out_controller.dart';
 /// its confirmation step.
 Future<void> confirmAndSignOut(BuildContext context, WidgetRef ref) async {
   final platformSession = ref.read(authRoleProvider) == AuthRole.superAdmin;
+  // Only a backend build keeps an offline copy of the account to lose; while
+  // offline, the server cannot hear the sign-out either.
+  final offlineCopy = ref.read(authRepositoryProvider) is HttpAuthRepository;
+  final offline = ref.read(currentUserResultProvider).valueOrNull is Offline;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -39,6 +46,15 @@ Future<void> confirmAndSignOut(BuildContext context, WidgetRef ref) async {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(S.signOutConfirm),
+          if (offlineCopy) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              offline
+                  ? '${S.signOutOfflineCopyNote} ${S.signOutOfflineServerNote}'
+                  : S.signOutOfflineCopyNote,
+              key: const Key('sign-out-offline-note'),
+            ),
+          ],
           if (platformSession) ...[
             const SizedBox(height: AppSpacing.md),
             const Text(S.breakGlassSignOutWarning),
@@ -86,7 +102,7 @@ Future<void> signOutAndLeave(BuildContext context, WidgetRef ref) async {
     // Sign-out is a request, not a local write: it cannot be queued for
     // later, because the session it revokes is the one being used offline.
     offline: (_) => messenger.showSnackBar(
-      const SnackBar(content: Text(S.offlineTitle)),
+      actionNeedsConnectionSnackBar,
     ),
   );
 }
